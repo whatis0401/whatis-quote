@@ -1613,7 +1613,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
             <img
               src="/whatis-logo.png"
               alt="whatis"
-              style={{ width: 76, height: 76, objectFit: "contain" }}
+              style={{ width: 175, height: "auto", objectFit: "contain" }}
             />
             <div style={{ fontSize: 17, fontWeight: 400, letterSpacing: 4, color: "#333" }}>
               {settings.company_name || "何為設計有限公司"}
