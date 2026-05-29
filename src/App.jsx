@@ -380,6 +380,7 @@ export default function App() {
 
   const saveTimer = useRef(null);
 
+  // 讀取全部資料
   useEffect(() => {
     async function loadAll() {
       try {
@@ -1607,10 +1608,14 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
     return (
       <div style={{ marginBottom: 24 }}>
         {/* LOGO 區 */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
-          <div>
-            <div style={{ fontSize: 11, letterSpacing: 4, color: "#888", marginBottom: 2 }}>WHATIS ARCH DESIGN</div>
-            <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: 2, color: "#333" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            <img
+              src="/whatis-logo.png"
+              alt="whatis"
+              style={{ width: 56, height: 56, objectFit: "contain" }}
+            />
+            <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: 2, color: "#333" }}>
               {settings.company_name || "何為設計有限公司"}
             </div>
           </div>
@@ -1621,20 +1626,22 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
           )}
         </div>
         <div style={{ borderTop: "1px solid #ccc", marginBottom: 14 }} />
-        {/* 工程資訊 */}
-        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto", gap: "4px 16px", fontSize: 13 }}>
-          <span style={{ color: "#888" }}>工程名稱</span>
-          <span style={{ color: "#888" }}>/</span>
-          <span style={{ fontWeight: 600 }}>{quote.projectName || quote.name}</span>
+        {/* 工程資訊（靠左排列） */}
+        <div style={{ fontSize: 13, lineHeight: 1.9 }}>
+          <div style={{ display: "flex", alignItems: "baseline" }}>
+            <span style={{ color: "#888", width: 70, flexShrink: 0 }}>工程名稱</span>
+            <span style={{ color: "#888", marginRight: 12 }}>/</span>
+            <span style={{ fontWeight: 600 }}>{quote.projectName || quote.name}</span>
+          </div>
           {quote.projectAddress && (
-            <>
-              <span style={{ color: "#888" }}>工程地址</span>
-              <span style={{ color: "#888" }}>/</span>
+            <div style={{ display: "flex", alignItems: "baseline" }}>
+              <span style={{ color: "#888", width: 70, flexShrink: 0 }}>工程地址</span>
+              <span style={{ color: "#888", marginRight: 12 }}>/</span>
               <span>{quote.projectAddress}</span>
-            </>
+            </div>
           )}
         </div>
-        <div style={{ textAlign: "right", fontSize: 12, color: "#888", marginTop: 4 }}>
+        <div style={{ textAlign: "right", fontSize: 12, color: "#888", marginTop: 8 }}>
           {quote.date ? `${quote.date.replace(/-/g, "/")}` : ""}
         </div>
       </div>
@@ -1786,8 +1793,9 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
   // 明細頁
   function DetailPage({ groupData }) {
-    const label = { padding: "6px 8px", fontSize: 12, borderBottom: "1px solid #eee", verticalAlign: "top" };
-    const amount = { ...label, textAlign: "right" };
+    const cell = { padding: "8px 6px", fontSize: 12, borderBottom: "1px solid #eee", verticalAlign: "middle", textAlign: "center" };
+    const cellLeft = { ...cell, textAlign: "left" };
+    const cellRight = { ...cell, textAlign: "right" };
 
     return (
       <div style={{ ...ps, maxWidth: 780, margin: "0 auto" }}>
@@ -1806,36 +1814,45 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                   {cd.cat ? `${cd.cat.name}` : "其他"}
                 </div>
 
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                  <colgroup>
+                    <col style={{ width: 32 }} />
+                    <col />
+                    <col style={{ width: 44 }} />
+                    <col style={{ width: 52 }} />
+                    <col style={{ width: 74 }} />
+                    <col style={{ width: 86 }} />
+                    <col style={{ width: 110 }} />
+                  </colgroup>
                   <thead>
                     <tr style={{ fontSize: 11, color: "#888", background: "#fafafa" }}>
-                      <th style={{ ...label, width: 30, textAlign: "center" }}>#</th>
-                      <th style={label}>工程細項</th>
-                      <th style={{ ...amount, width: 50 }}>單位</th>
-                      <th style={{ ...amount, width: 60 }}>數量</th>
-                      <th style={{ ...amount, width: 80 }}>單價</th>
-                      <th style={{ ...amount, width: 90 }}>金額</th>
-                      <th style={{ ...label, width: 120 }}>備註</th>
+                      <th style={cell}>#</th>
+                      <th style={cell}>工程細項</th>
+                      <th style={cell}>單位</th>
+                      <th style={cell}>數量</th>
+                      <th style={cell}>單價</th>
+                      <th style={cell}>金額</th>
+                      <th style={cell}>備註</th>
                     </tr>
                   </thead>
                   <tbody>
                     {cd.catItems.map((it, i) => (
                       <tr key={it.id}>
-                        <td style={{ ...label, textAlign: "center", color: "#aaa" }}>{i + 1}</td>
-                        <td style={label}>{it.itemName}</td>
-                        <td style={amount}>{it.unit}</td>
-                        <td style={amount}>{it.qty}</td>
-                        <td style={amount}>{fmt(it.price)}</td>
-                        <td style={amount}>{fmt(it.total)}</td>
-                        <td style={label}>{it.note}</td>
+                        <td style={{ ...cell, color: "#aaa" }}>{i + 1}</td>
+                        <td style={cellLeft}>{it.itemName}</td>
+                        <td style={cell}>{it.unit}</td>
+                        <td style={cellRight}>{it.qty}</td>
+                        <td style={cellRight}>{fmt(it.price)}</td>
+                        <td style={cellRight}>{fmt(it.total)}</td>
+                        <td style={cellLeft}>{it.note}</td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr style={{ fontWeight: 600, background: "#fafafa" }}>
-                      <td colSpan={5} style={{ ...label, textAlign: "right", color: "#888" }}>小計</td>
-                      <td style={amount}>${fmt(cd.catTotal)}</td>
-                      <td style={label}></td>
+                      <td colSpan={5} style={{ ...cellRight, color: "#888" }}>小計</td>
+                      <td style={cellRight}>${fmt(cd.catTotal)}</td>
+                      <td style={cell}></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1849,42 +1866,55 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
   // 獨立品項列印
   function IndependentPage() {
-    const label = { padding: "8px 8px", fontSize: 13, borderBottom: "1px solid #eee", verticalAlign: "top" };
-    const amount = { ...label, textAlign: "right" };
+    const cell = { padding: "10px 8px", fontSize: 13, borderBottom: "1px solid #eee", verticalAlign: "middle", textAlign: "center" };
+    const cellLeft = { ...cell, textAlign: "left" };
+    const cellRight = { ...cell, textAlign: "right" };
     const showCost = !isClient;
 
     return (
       <div style={{ ...ps, maxWidth: 780, margin: "0 auto" }}>
         <PrintHeader />
 
-        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20, tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: 40 }} />
+            <col style={{ width: 56 }} />
+            <col />
+            <col style={{ width: 48 }} />
+            <col style={{ width: 56 }} />
+            {showCost && <col style={{ width: 64 }} />}
+            {showCost && <col style={{ width: 48 }} />}
+            <col style={{ width: 78 }} />
+            <col style={{ width: 90 }} />
+            <col style={{ width: 110 }} />
+          </colgroup>
           <thead>
             <tr style={{ fontSize: 11, color: "#888", background: "#f5f5f5" }}>
-              <th style={{ ...label, width: 40, textAlign: "center" }}>項次</th>
-              <th style={{ ...label, width: 60, textAlign: "center" }}>位置</th>
-              <th style={label}>工程細項</th>
-              <th style={{ ...amount, width: 50 }}>單位</th>
-              <th style={{ ...amount, width: 60 }}>數量</th>
-              {showCost && <th style={{ ...amount, width: 70 }}>成本</th>}
-              {showCost && <th style={{ ...amount, width: 50 }}>倍率</th>}
-              <th style={{ ...amount, width: 80 }}>單價</th>
-              <th style={{ ...amount, width: 90 }}>金額</th>
-              <th style={{ ...label, width: 120 }}>備註</th>
+              <th style={cell}>項次</th>
+              <th style={cell}>位置</th>
+              <th style={cell}>工程細項</th>
+              <th style={cell}>單位</th>
+              <th style={cell}>數量</th>
+              {showCost && <th style={cell}>成本</th>}
+              {showCost && <th style={cell}>倍率</th>}
+              <th style={cell}>單價</th>
+              <th style={cell}>金額</th>
+              <th style={cell}>備註</th>
             </tr>
           </thead>
           <tbody>
             {items.map((it, i) => (
               <tr key={it.id}>
-                <td style={{ ...label, textAlign: "center", color: "#aaa" }}>{i + 1}</td>
-                <td style={{ ...label, textAlign: "center" }}>{it.position || ""}</td>
-                <td style={label}>{it.itemName}</td>
-                <td style={amount}>{it.unit}</td>
-                <td style={amount}>{it.qty}</td>
-                {showCost && <td style={amount}>{it.cost ? fmt(it.cost) : ""}</td>}
-                {showCost && <td style={amount}>{it.multiplier || ""}</td>}
-                <td style={amount}>{fmt(it.price)}</td>
-                <td style={amount}>{fmt(it.total)}</td>
-                <td style={label}>{it.note}</td>
+                <td style={{ ...cell, color: "#aaa" }}>{i + 1}</td>
+                <td style={cell}>{it.position || ""}</td>
+                <td style={cellLeft}>{it.itemName}</td>
+                <td style={cell}>{it.unit}</td>
+                <td style={cellRight}>{it.qty}</td>
+                {showCost && <td style={cellRight}>{it.cost ? fmt(it.cost) : ""}</td>}
+                {showCost && <td style={cellRight}>{it.multiplier || ""}</td>}
+                <td style={cellRight}>{fmt(it.price)}</td>
+                <td style={cellRight}>{fmt(it.total)}</td>
+                <td style={cellLeft}>{it.note}</td>
               </tr>
             ))}
           </tbody>
@@ -1940,7 +1970,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
   function PrintFooter({ quote, settings, bankAccount, isClient }) {
     return (
       <div style={{ borderTop: "1px solid #ddd", paddingTop: 16, marginTop: 8 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, fontSize: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, fontSize: 12, marginBottom: 32 }}>
           {/* 備註 */}
           {quote.terms && (
             <div>
@@ -1949,7 +1979,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
             </div>
           )}
 
-          {/* 右側：公司資訊、匯款、簽章 */}
+          {/* 右側：公司資訊、匯款 */}
           <div>
             {/* 公司資訊 */}
             <div style={{ marginBottom: 12 }}>
@@ -1963,7 +1993,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
             {/* 匯款帳戶 */}
             {quote.showBankAccount && bankAccount && (
-              <div style={{ marginBottom: 12 }}>
+              <div>
                 <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 12 }}>匯款帳戶</div>
                 <div style={{ color: "#555", lineHeight: 1.8 }}>
                   {bankAccount.bankName} {bankAccount.branchName}({bankAccount.bankCode})<br />
@@ -1972,16 +2002,18 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
 
-            {/* 客戶簽章 */}
-            <div style={{ display: "flex", gap: 20, marginTop: 8 }}>
-              <div style={{ flex: 1, borderTop: "1px solid #ccc", paddingTop: 4, fontSize: 11, color: "#888", textAlign: "center" }}>
-                客戶簽章
-              </div>
-              <div style={{ flex: 1, borderTop: "1px solid #ccc", paddingTop: 4, fontSize: 11, color: "#888", textAlign: "center" }}>
-                經辦人
-              </div>
-            </div>
+        {/* 客戶簽章 / 經辦人（獨立於下方，留簽名空間）*/}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, marginTop: 24 }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>客戶簽章</div>
+            <div style={{ height: 70, border: "1px solid #ddd", borderRadius: 4, background: "#fafafa" }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>經辦人</div>
+            <div style={{ height: 70, border: "1px solid #ddd", borderRadius: 4, background: "#fafafa" }} />
           </div>
         </div>
       </div>
