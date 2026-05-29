@@ -1608,19 +1608,19 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
   function PrintHeader({ showType = true }) {
     return (
       <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 14 }}>
             <img
               src="/whatis-logo.png"
               alt="whatis"
               style={{ width: 175, height: "auto", objectFit: "contain" }}
             />
-            <div style={{ fontSize: 17, fontWeight: 400, letterSpacing: 4, color: "#333" }}>
+            <div style={{ fontSize: 17, fontWeight: 400, letterSpacing: 4, color: "#333", paddingBottom: 2 }}>
               {settings.company_name || "何為設計有限公司"}
             </div>
           </div>
           {showType && (
-            <div style={{ fontSize: 17, fontWeight: 400, letterSpacing: 8, color: "#333" }}>
+            <div style={{ fontSize: 17, fontWeight: 400, letterSpacing: 8, color: "#333", paddingBottom: 2 }}>
               工 程 報 價 單
             </div>
           )}
