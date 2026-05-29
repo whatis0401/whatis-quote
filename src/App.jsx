@@ -1585,6 +1585,19 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
   const categories = settings.engineering_categories || [];
   const bankAccount = (settings.bank_accounts || []).find(b => b.id === quote.bankAccountId);
 
+  // ─── 即時調整面板 state ───────────────────────────────────
+  const [showAdjust, setShowAdjust] = useState(false);
+  const [adj, setAdj] = useState({
+    logoWidth: 175,
+    logoGap: 14,
+    companyFontSize: 17,
+    companyLetterSpacing: 4,
+    titleFontSize: 17,
+    titleLetterSpacing: 8,
+    headerMarginBottom: 16,
+  });
+  function setA(key, val) { setAdj(prev => ({ ...prev, [key]: Number(val) })); }
+
   useEffect(() => {
     const style = document.createElement("style");
     style.innerHTML = `
@@ -1608,19 +1621,19 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
   function PrintHeader({ showType = true }) {
     return (
       <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: adj.headerMarginBottom }}>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: adj.logoGap }}>
             <img
               src="/whatis-logo.png"
               alt="whatis"
-              style={{ width: 175, height: "auto", objectFit: "contain" }}
+              style={{ width: adj.logoWidth, height: "auto", objectFit: "contain" }}
             />
-            <div style={{ fontSize: 17, fontWeight: 400, letterSpacing: 4, color: "#333", paddingBottom: 2 }}>
+            <div style={{ fontSize: adj.companyFontSize, fontWeight: 400, letterSpacing: adj.companyLetterSpacing, color: "#333" }}>
               {settings.company_name || "何為設計有限公司"}
             </div>
           </div>
           {showType && (
-            <div style={{ fontSize: 17, fontWeight: 400, letterSpacing: 8, color: "#333", paddingBottom: 2 }}>
+            <div style={{ fontSize: adj.titleFontSize, fontWeight: 400, letterSpacing: adj.titleLetterSpacing, color: "#333" }}>
               工 程 報 價 單
             </div>
           )}
@@ -2034,10 +2047,59 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
         <span style={{ fontSize: 13, color: "#888" }}>
           {isClient ? "客戶版" : "內部版"} · {quote.name}
         </span>
-        <button style={{ ...S.btn, marginLeft: "auto" }} onClick={() => window.print()}>
+        <button
+          style={{ ...S.btnSecondary, marginLeft: "auto", background: showAdjust ? "#f5f5f5" : "transparent" }}
+          onClick={() => setShowAdjust(!showAdjust)}
+        >⚙ 調整版面</button>
+        <button style={S.btn} onClick={() => window.print()}>
           列印 / 儲存 PDF
         </button>
       </div>
+
+      {/* 調整面板 */}
+      {showAdjust && (
+        <div className="no-print" style={{
+          position: "fixed", top: 53, right: 0,
+          background: "#fff", borderLeft: "1px solid #e0e0e0", borderBottom: "1px solid #e0e0e0",
+          padding: "20px 24px", zIndex: 99, width: 280,
+          boxShadow: "-2px 4px 12px rgba(0,0,0,0.06)",
+          maxHeight: "calc(100vh - 53px)", overflowY: "auto",
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#555", marginBottom: 16, letterSpacing: 0.5 }}>抬頭版面調整</div>
+
+          {[
+            { key: "logoWidth", label: "LOGO 寬度", min: 80, max: 300, unit: "px" },
+            { key: "logoGap", label: "LOGO 與公司名稱間距", min: 0, max: 60, unit: "px" },
+            { key: "companyFontSize", label: "公司名稱字體大小", min: 10, max: 32, unit: "px" },
+            { key: "companyLetterSpacing", label: "公司名稱字距", min: 0, max: 20, unit: "px" },
+            { key: "titleFontSize", label: "「工程報價單」字體大小", min: 10, max: 32, unit: "px" },
+            { key: "titleLetterSpacing", label: "「工程報價單」字距", min: 0, max: 20, unit: "px" },
+            { key: "headerMarginBottom", label: "抬頭下方間距", min: 0, max: 48, unit: "px" },
+          ].map(({ key, label, min, max, unit }) => (
+            <div key={key} style={{ marginBottom: 14 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                <span style={{ fontSize: 11, color: "#888" }}>{label}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: "#333" }}>{adj[key]}{unit}</span>
+              </div>
+              <input
+                type="range" min={min} max={max} value={adj[key]}
+                onChange={e => setA(key, e.target.value)}
+                style={{ width: "100%" }}
+              />
+            </div>
+          ))}
+
+          <div style={{ borderTop: "1px solid #eee", paddingTop: 14, marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: "#aaa", marginBottom: 8 }}>調整滿意後，把以下數值貼給 Claude：</div>
+            <textarea
+              readOnly
+              value={JSON.stringify(adj, null, 2)}
+              style={{ width: "100%", height: 160, fontSize: 10, color: "#555", border: "1px solid #eee", borderRadius: 4, padding: 8, resize: "none", fontFamily: "monospace", boxSizing: "border-box" }}
+              onClick={e => e.target.select()}
+            />
+          </div>
+        </div>
+      )}
 
       <div style={{ marginTop: 60 }}>
         {/* 整合式：總表 + 明細各自一頁 */}
