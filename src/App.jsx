@@ -470,7 +470,7 @@ export default function App() {
       <Sidebar page={page} setPage={setPage} />
 
       {/* 主內容 */}
-      <div style={S.main}>
+      <div id="main-content" style={S.main}>
         {page === "list" && (
           <QuoteList
             quotes={quotes}
@@ -598,7 +598,7 @@ function Sidebar({ page, setPage }) {
     { id: "settings", label: "系統設定" },
   ];
   return (
-    <div style={S.sidebar}>
+    <div id="sidebar" style={S.sidebar}>
       {/* LOGO */}
       <div style={{ padding: "0 24px 32px" }}>
         <div style={{ fontSize: 11, letterSpacing: 3, color: "#888", marginBottom: 2 }}>WHATIS</div>
@@ -1605,6 +1605,8 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
         .no-print { display: none !important; }
         body { margin: 0; }
         .print-page { margin: 0; padding: 0; }
+        #sidebar { display: none !important; }
+        #main-content { margin-left: 0 !important; padding: 0 !important; }
       }
     `;
     document.head.appendChild(style);
