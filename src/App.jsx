@@ -380,32 +380,31 @@ export default function App() {
 
   const saveTimer = useRef(null);
 
-  // 讀取全部資料
-  const loadAll = useCallback(async () => {
-    try {
-      const [qRows, iRows, tRows, sRows] = await Promise.all([
-        sheetGet("Quotes"),
-        sheetGet("QuoteItems"),
-        sheetGet("Templates"),
-        sheetGet("Settings"),
-      ]);
-      setQuotes(rowsToQuotes(qRows));
-      setAllItems(rowsToItems(iRows));
-      setTemplates(rowsToTemplates(tRows));
-      const s = rowsToSettings(sRows);
-      // 解析 JSON 欄位
-      ["bank_accounts","engineering_groups","engineering_categories","term_templates"].forEach(k => {
-        if (s[k]) try { s[k] = JSON.parse(s[k]); } catch { s[k] = []; }
-      });
-      setSettings(s);
-    } catch (e) {
-      showNotif("載入失敗：" + e.message, "error");
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    async function loadAll() {
+      try {
+        const [qRows, iRows, tRows, sRows] = await Promise.all([
+          sheetGet("Quotes"),
+          sheetGet("QuoteItems"),
+          sheetGet("Templates"),
+          sheetGet("Settings"),
+        ]);
+        setQuotes(rowsToQuotes(qRows));
+        setAllItems(rowsToItems(iRows));
+        setTemplates(rowsToTemplates(tRows));
+        const s = rowsToSettings(sRows);
+        ["bank_accounts","engineering_groups","engineering_categories","term_templates"].forEach(k => {
+          if (s[k]) try { s[k] = JSON.parse(s[k]); } catch { s[k] = []; }
+        });
+        setSettings(s);
+      } catch (e) {
+        setNotification({ msg: "載入失敗：" + e.message, type: "error" });
+      } finally {
+        setLoading(false);
+      }
     }
+    loadAll();
   }, []);
-
-  useEffect(() => { loadAll(); }, [loadAll]);
 
   // 儲存
   const scheduleSave = useCallback((newQuotes, newItems, newSettings) => {
