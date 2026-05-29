@@ -1588,13 +1588,13 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
   // ─── 即時調整面板 state ───────────────────────────────────
   const [showAdjust, setShowAdjust] = useState(false);
   const [adj, setAdj] = useState({
-    logoWidth: 175,
-    logoGap: 14,
-    companyFontSize: 17,
-    companyLetterSpacing: 4,
-    titleFontSize: 17,
-    titleLetterSpacing: 8,
-    headerMarginBottom: 16,
+    logoWidth: 170,
+    logoGap: 20,
+    companyFontSize: 14,
+    companyLetterSpacing: 10,
+    titleFontSize: 14,
+    titleLetterSpacing: 3,
+    headerMarginBottom: 19,
   });
   function setA(key, val) { setAdj(prev => ({ ...prev, [key]: Number(val) })); }
 
