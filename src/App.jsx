@@ -1599,7 +1599,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
   }, []);
 
   const ps = {
-    fontFamily: '"微軟正黑體","Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif',
+    fontFamily: '"Noto Serif TC","思源宋體","Source Han Serif TC",serif',
     color: "#333",
     fontSize: 13,
   };
@@ -1607,26 +1607,34 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
   function PrintHeader({ showType = true }) {
     return (
       <div style={{ marginBottom: 24 }}>
-        {/* LOGO 區 */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 110 }}>
             <img
               src="/whatis-logo.png"
               alt="whatis"
-              style={{ width: 56, height: 56, objectFit: "contain" }}
+              style={{ width: 110, height: 110, objectFit: "contain" }}
             />
-            <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: 2, color: "#333" }}>
-              {settings.company_name || "何為設計有限公司"}
+            <div style={{
+              fontSize: 11,
+              fontWeight: 500,
+              color: "#333",
+              width: "100%",
+              textAlign: "center",
+              display: "flex",
+              justifyContent: "space-between",
+            }}>
+              {(settings.company_name || "何為設計有限公司").split("").map((ch, i) => (
+                <span key={i}>{ch}</span>
+              ))}
             </div>
           </div>
           {showType && (
-            <div style={{ fontSize: 15, fontWeight: 500, letterSpacing: 6, color: "#333" }}>
+            <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: 8, color: "#333", paddingBottom: 4 }}>
               工 程 報 價 單
             </div>
           )}
         </div>
         <div style={{ borderTop: "1px solid #ccc", marginBottom: 14 }} />
-        {/* 工程資訊（靠左排列） */}
         <div style={{ fontSize: 13, lineHeight: 1.9 }}>
           <div style={{ display: "flex", alignItems: "baseline" }}>
             <span style={{ color: "#888", width: 70, flexShrink: 0 }}>工程名稱</span>
@@ -1793,9 +1801,10 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
   // 明細頁
   function DetailPage({ groupData }) {
-    const cell = { padding: "8px 6px", fontSize: 12, borderBottom: "1px solid #eee", verticalAlign: "middle", textAlign: "center" };
-    const cellLeft = { ...cell, textAlign: "left" };
-    const cellRight = { ...cell, textAlign: "right" };
+    const cellBase = { padding: "8px 6px", fontSize: 12, borderBottom: "1px solid #eee", verticalAlign: "middle" };
+    const cellCenter = { ...cellBase, textAlign: "center" };
+    const cellLeft = { ...cellBase, textAlign: "left" };
+    const cellRight = { ...cellBase, textAlign: "right" };
 
     return (
       <div style={{ ...ps, maxWidth: 780, margin: "0 auto" }}>
@@ -1826,21 +1835,21 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                   </colgroup>
                   <thead>
                     <tr style={{ fontSize: 11, color: "#888", background: "#fafafa" }}>
-                      <th style={cell}>#</th>
-                      <th style={cell}>工程細項</th>
-                      <th style={cell}>單位</th>
-                      <th style={cell}>數量</th>
-                      <th style={cell}>單價</th>
-                      <th style={cell}>金額</th>
-                      <th style={cell}>備註</th>
+                      <th style={cellCenter}>#</th>
+                      <th style={cellLeft}>工程細項</th>
+                      <th style={cellCenter}>單位</th>
+                      <th style={cellRight}>數量</th>
+                      <th style={cellRight}>單價</th>
+                      <th style={cellRight}>金額</th>
+                      <th style={cellLeft}>備註</th>
                     </tr>
                   </thead>
                   <tbody>
                     {cd.catItems.map((it, i) => (
                       <tr key={it.id}>
-                        <td style={{ ...cell, color: "#aaa" }}>{i + 1}</td>
+                        <td style={{ ...cellCenter, color: "#aaa" }}>{i + 1}</td>
                         <td style={cellLeft}>{it.itemName}</td>
-                        <td style={cell}>{it.unit}</td>
+                        <td style={cellCenter}>{it.unit}</td>
                         <td style={cellRight}>{it.qty}</td>
                         <td style={cellRight}>{fmt(it.price)}</td>
                         <td style={cellRight}>{fmt(it.total)}</td>
@@ -1852,7 +1861,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                     <tr style={{ fontWeight: 600, background: "#fafafa" }}>
                       <td colSpan={5} style={{ ...cellRight, color: "#888" }}>小計</td>
                       <td style={cellRight}>${fmt(cd.catTotal)}</td>
-                      <td style={cell}></td>
+                      <td style={cellLeft}></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1866,9 +1875,10 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
   // 獨立品項列印
   function IndependentPage() {
-    const cell = { padding: "10px 8px", fontSize: 13, borderBottom: "1px solid #eee", verticalAlign: "middle", textAlign: "center" };
-    const cellLeft = { ...cell, textAlign: "left" };
-    const cellRight = { ...cell, textAlign: "right" };
+    const cellBase = { padding: "10px 8px", fontSize: 13, borderBottom: "1px solid #eee", verticalAlign: "middle" };
+    const cellCenter = { ...cellBase, textAlign: "center" };
+    const cellLeft = { ...cellBase, textAlign: "left" };
+    const cellRight = { ...cellBase, textAlign: "right" };
     const showCost = !isClient;
 
     return (
@@ -1890,25 +1900,25 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
           </colgroup>
           <thead>
             <tr style={{ fontSize: 11, color: "#888", background: "#f5f5f5" }}>
-              <th style={cell}>項次</th>
-              <th style={cell}>位置</th>
-              <th style={cell}>工程細項</th>
-              <th style={cell}>單位</th>
-              <th style={cell}>數量</th>
-              {showCost && <th style={cell}>成本</th>}
-              {showCost && <th style={cell}>倍率</th>}
-              <th style={cell}>單價</th>
-              <th style={cell}>金額</th>
-              <th style={cell}>備註</th>
+              <th style={cellCenter}>項次</th>
+              <th style={cellCenter}>位置</th>
+              <th style={cellLeft}>工程細項</th>
+              <th style={cellCenter}>單位</th>
+              <th style={cellRight}>數量</th>
+              {showCost && <th style={cellRight}>成本</th>}
+              {showCost && <th style={cellRight}>倍率</th>}
+              <th style={cellRight}>單價</th>
+              <th style={cellRight}>金額</th>
+              <th style={cellLeft}>備註</th>
             </tr>
           </thead>
           <tbody>
             {items.map((it, i) => (
               <tr key={it.id}>
-                <td style={{ ...cell, color: "#aaa" }}>{i + 1}</td>
-                <td style={cell}>{it.position || ""}</td>
+                <td style={{ ...cellCenter, color: "#aaa" }}>{i + 1}</td>
+                <td style={cellCenter}>{it.position || ""}</td>
                 <td style={cellLeft}>{it.itemName}</td>
-                <td style={cell}>{it.unit}</td>
+                <td style={cellCenter}>{it.unit}</td>
                 <td style={cellRight}>{it.qty}</td>
                 {showCost && <td style={cellRight}>{it.cost ? fmt(it.cost) : ""}</td>}
                 {showCost && <td style={cellRight}>{it.multiplier || ""}</td>}
