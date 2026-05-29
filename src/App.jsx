@@ -1603,39 +1603,30 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
     color: "#333",
     fontSize: 13,
   };
+  const bodyFont = '"微軟正黑體","Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
 
   function PrintHeader({ showType = true }) {
     return (
       <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 110 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <img
               src="/whatis-logo.png"
               alt="whatis"
-              style={{ width: 110, height: 110, objectFit: "contain" }}
+              style={{ width: 90, height: 90, objectFit: "contain" }}
             />
-            <div style={{
-              fontSize: 11,
-              fontWeight: 500,
-              color: "#333",
-              width: "100%",
-              textAlign: "center",
-              display: "flex",
-              justifyContent: "space-between",
-            }}>
-              {(settings.company_name || "何為設計有限公司").split("").map((ch, i) => (
-                <span key={i}>{ch}</span>
-              ))}
+            <div style={{ fontSize: 20, fontWeight: 500, letterSpacing: 4, color: "#333" }}>
+              {settings.company_name || "何為設計有限公司"}
             </div>
           </div>
           {showType && (
-            <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: 8, color: "#333", paddingBottom: 4 }}>
+            <div style={{ fontSize: 16, fontWeight: 500, letterSpacing: 8, color: "#333" }}>
               工 程 報 價 單
             </div>
           )}
         </div>
         <div style={{ borderTop: "1px solid #ccc", marginBottom: 14 }} />
-        <div style={{ fontSize: 13, lineHeight: 1.9 }}>
+        <div style={{ fontSize: 13, lineHeight: 1.9, fontFamily: bodyFont }}>
           <div style={{ display: "flex", alignItems: "baseline" }}>
             <span style={{ color: "#888", width: 70, flexShrink: 0 }}>工程名稱</span>
             <span style={{ color: "#888", marginRight: 12 }}>/</span>
@@ -1649,7 +1640,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
             </div>
           )}
         </div>
-        <div style={{ textAlign: "right", fontSize: 12, color: "#888", marginTop: 8 }}>
+        <div style={{ textAlign: "right", fontSize: 12, color: "#888", marginTop: 8, fontFamily: bodyFont }}>
           {quote.date ? `${quote.date.replace(/-/g, "/")}` : ""}
         </div>
       </div>
@@ -1680,8 +1671,8 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
   // 整合式第一頁：總表
   function SummaryPage() {
-    const label = { padding: "6px 10px", fontSize: 13, borderBottom: "1px solid #eee" };
-    const amount = { padding: "6px 10px", textAlign: "right", fontSize: 13, borderBottom: "1px solid #eee" };
+    const label = { padding: "6px 10px", fontSize: 13, borderBottom: "1px solid #eee", fontFamily: bodyFont };
+    const amount = { padding: "6px 10px", textAlign: "right", fontSize: 13, borderBottom: "1px solid #eee", fontFamily: bodyFont };
     const letters = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];
 
     return (
@@ -1801,7 +1792,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
   // 明細頁
   function DetailPage({ groupData }) {
-    const cellBase = { padding: "8px 6px", fontSize: 12, borderBottom: "1px solid #eee", verticalAlign: "middle" };
+    const cellBase = { padding: "8px 6px", fontSize: 12, borderBottom: "1px solid #eee", verticalAlign: "middle", fontFamily: bodyFont };
     const cellCenter = { ...cellBase, textAlign: "center" };
     const cellLeft = { ...cellBase, textAlign: "left" };
     const cellRight = { ...cellBase, textAlign: "right" };
@@ -1838,10 +1829,10 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                       <th style={cellCenter}>#</th>
                       <th style={cellLeft}>工程細項</th>
                       <th style={cellCenter}>單位</th>
-                      <th style={cellRight}>數量</th>
+                      <th style={cellCenter}>數量</th>
                       <th style={cellRight}>單價</th>
                       <th style={cellRight}>金額</th>
-                      <th style={cellLeft}>備註</th>
+                      <th style={cellRight}>備註</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1850,10 +1841,10 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                         <td style={{ ...cellCenter, color: "#aaa" }}>{i + 1}</td>
                         <td style={cellLeft}>{it.itemName}</td>
                         <td style={cellCenter}>{it.unit}</td>
-                        <td style={cellRight}>{it.qty}</td>
+                        <td style={cellCenter}>{it.qty}</td>
                         <td style={cellRight}>{fmt(it.price)}</td>
                         <td style={cellRight}>{fmt(it.total)}</td>
-                        <td style={cellLeft}>{it.note}</td>
+                        <td style={cellRight}>{it.note}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1861,7 +1852,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                     <tr style={{ fontWeight: 600, background: "#fafafa" }}>
                       <td colSpan={5} style={{ ...cellRight, color: "#888" }}>小計</td>
                       <td style={cellRight}>${fmt(cd.catTotal)}</td>
-                      <td style={cellLeft}></td>
+                      <td style={cellRight}></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -1875,7 +1866,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
   // 獨立品項列印
   function IndependentPage() {
-    const cellBase = { padding: "10px 8px", fontSize: 13, borderBottom: "1px solid #eee", verticalAlign: "middle" };
+    const cellBase = { padding: "10px 8px", fontSize: 13, borderBottom: "1px solid #eee", verticalAlign: "middle", fontFamily: bodyFont };
     const cellCenter = { ...cellBase, textAlign: "center" };
     const cellLeft = { ...cellBase, textAlign: "left" };
     const cellRight = { ...cellBase, textAlign: "right" };
@@ -1904,12 +1895,12 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
               <th style={cellCenter}>位置</th>
               <th style={cellLeft}>工程細項</th>
               <th style={cellCenter}>單位</th>
-              <th style={cellRight}>數量</th>
+              <th style={cellCenter}>數量</th>
               {showCost && <th style={cellRight}>成本</th>}
-              {showCost && <th style={cellRight}>倍率</th>}
+              {showCost && <th style={cellCenter}>倍率</th>}
               <th style={cellRight}>單價</th>
               <th style={cellRight}>金額</th>
-              <th style={cellLeft}>備註</th>
+              <th style={cellRight}>備註</th>
             </tr>
           </thead>
           <tbody>
@@ -1919,12 +1910,12 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                 <td style={cellCenter}>{it.position || ""}</td>
                 <td style={cellLeft}>{it.itemName}</td>
                 <td style={cellCenter}>{it.unit}</td>
-                <td style={cellRight}>{it.qty}</td>
+                <td style={cellCenter}>{it.qty}</td>
                 {showCost && <td style={cellRight}>{it.cost ? fmt(it.cost) : ""}</td>}
-                {showCost && <td style={cellRight}>{it.multiplier || ""}</td>}
+                {showCost && <td style={cellCenter}>{it.multiplier || ""}</td>}
                 <td style={cellRight}>{fmt(it.price)}</td>
                 <td style={cellRight}>{fmt(it.total)}</td>
-                <td style={cellLeft}>{it.note}</td>
+                <td style={cellRight}>{it.note}</td>
               </tr>
             ))}
           </tbody>
@@ -1932,7 +1923,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
         {/* 金額區 */}
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
-          <table style={{ width: 280, borderCollapse: "collapse", fontSize: 13 }}>
+          <table style={{ width: 280, borderCollapse: "collapse", fontSize: 13, fontFamily: bodyFont }}>
             <tbody>
               <tr>
                 <td style={{ padding: "5px 10px", color: "#555" }}>項目小記</td>
@@ -1967,7 +1958,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
         </div>
 
         {quote.showChineseAmount && (
-          <div style={{ fontSize: 12, color: "#555", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: "#555", marginBottom: 12, fontFamily: bodyFont }}>
             合計新台幣：{toChineseAmount(summary.total)}
           </div>
         )}
@@ -1979,7 +1970,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
   function PrintFooter({ quote, settings, bankAccount, isClient }) {
     return (
-      <div style={{ borderTop: "1px solid #ddd", paddingTop: 16, marginTop: 8 }}>
+      <div style={{ borderTop: "1px solid #ddd", paddingTop: 16, marginTop: 8, fontFamily: bodyFont }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, fontSize: 12, marginBottom: 32 }}>
           {/* 備註 */}
           {quote.terms && (
