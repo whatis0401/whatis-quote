@@ -2195,8 +2195,12 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
       )}
 
       <div style={{ marginTop: 60 }} className="print-content">
-        {/* 整合式：總表 + 明細各自一頁 */}
-        {isIntegrated ? (
+        {/* 內部版：成本利潤分析表 */}
+        {!isClient ? (
+          <div className="print-card" style={{ background: "#fff", width: 794, maxWidth: "100%", margin: "0 auto", padding: "40px 48px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", boxSizing: "border-box" }}>
+            <InternalCostView quote={quote} items={items} summary={summary} settings={settings} isIntegrated={isIntegrated} />
+          </div>
+        ) : isIntegrated ? (
           <>
             <div className="print-card" style={{ background: "#fff", width: 794, maxWidth: "100%", margin: "0 auto 24px", padding: "40px 48px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", boxSizing: "border-box" }}>
               <SummaryPage />
@@ -2214,6 +2218,164 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
     </div>
   );
 }
+
+// ─── 內部版：成本利潤分析表 ─────────────────────────────────
+function InternalCostView({ quote, items, summary, settings, isIntegrated }) {
+    const groups = settings.engineering_groups || [];
+    const categories = settings.engineering_categories || [];
+    const bodyFont = '"微軟正黑體","Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+    const cell = { padding: "8px 10px", fontSize: 12, borderBottom: "1px solid #f0f0f0", verticalAlign: "middle", fontFamily: bodyFont };
+    const cellR = { ...cell, textAlign: "right" };
+    const cellC = { ...cell, textAlign: "center" };
+
+    // 計算整體數字
+    const totalCost = items.reduce((s, it) => s + toNum(it.cost) * toNum(it.qty), 0);
+    const totalRevenue = items.reduce((s, it) => s + toNum(it.total), 0);
+    const totalProfit = totalRevenue - totalCost;
+    const marginPct = totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100) : 0;
+
+    // 整合式：按群組/大項分組
+    function renderIntegratedRows() {
+      return groups.map(g => {
+        const gItems = items.filter(it => it.group === g.id);
+        if (gItems.length === 0) return null;
+        const catIds = [...new Set(gItems.map(it => it.category))];
+        return (
+          <tbody key={g.id}>
+            <tr>
+              <td colSpan={9} style={{ ...cell, background: "#f0f0ee", fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>
+                {g.name}
+              </td>
+            </tr>
+            {catIds.map(catId => {
+              const cat = categories.find(c => c.id === catId);
+              const catItems = gItems.filter(it => it.category === catId);
+              return (
+                <React.Fragment key={catId}>
+                  <tr>
+                    <td colSpan={9} style={{ ...cell, background: "#fafafa", fontWeight: 600, paddingLeft: 20, color: "#555" }}>
+                      {cat ? cat.name : "其他"}
+                    </td>
+                  </tr>
+                  {catItems.map((it, i) => renderItemRow(it, i))}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        );
+      });
+    }
+
+    function renderItemRow(it, i) {
+      const costTotal = Math.round(toNum(it.cost) * toNum(it.qty));
+      const profit = toNum(it.total) - costTotal;
+      const itemMargin = toNum(it.total) > 0 ? Math.round((profit / toNum(it.total)) * 100) : 0;
+      return (
+        <tr key={it.id} style={{ background: i % 2 === 0 ? "#fff" : "#fdfdfb" }}>
+          <td style={{ ...cell, color: "#aaa", textAlign: "center" }}>{i + 1}</td>
+          <td style={cell}>{it.itemName}</td>
+          <td style={cellC}>{it.unit}</td>
+          <td style={cellC}>{it.qty}</td>
+          <td style={cellR}>{it.cost ? fmt(it.cost) : "—"}</td>
+          <td style={cellC}>{it.multiplier || "—"}</td>
+          <td style={cellR}>{fmt(it.price)}</td>
+          <td style={cellR}>{fmt(costTotal)}</td>
+          <td style={{ ...cellR, color: profit >= 0 ? "#5a8f6a" : "#c0675a", fontWeight: 600 }}>
+            {profit >= 0 ? "+" : ""}{fmt(profit)}
+            <span style={{ fontSize: 10, color: "#aaa", marginLeft: 4 }}>({itemMargin}%)</span>
+          </td>
+        </tr>
+      );
+    }
+
+    return (
+      <div style={{ fontFamily: bodyFont, color: "#333", fontSize: 13 }}>
+        {/* 標題 */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#aaa", letterSpacing: 2, marginBottom: 4 }}>INTERNAL USE ONLY</div>
+            <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: 1 }}>成本利潤分析表</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{quote.projectName || quote.name}</div>
+            <div style={{ fontSize: 12, color: "#888" }}>{quote.clientName} · {quote.date}</div>
+          </div>
+        </div>
+
+        {/* 摘要卡片 */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
+          {[
+            { label: "報價合計（未稅）", value: `$${fmt(totalRevenue)}`, color: "#333" },
+            { label: "成本合計", value: `$${fmt(totalCost)}`, color: "#555" },
+            { label: "毛利", value: `$${fmt(totalProfit)}`, color: totalProfit >= 0 ? "#5a8f6a" : "#c0675a" },
+            { label: "毛利率", value: `${marginPct}%`, color: totalProfit >= 0 ? "#5a8f6a" : "#c0675a" },
+          ].map(card => (
+            <div key={card.label} style={{ background: "#f9f9f7", border: "1px solid #eee", borderRadius: 6, padding: "12px 16px" }}>
+              <div style={{ fontSize: 11, color: "#aaa", marginBottom: 6 }}>{card.label}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: card.color }}>{card.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* 管理費 & 稅金 */}
+        {quote.managementFeeMode !== "none" && (
+          <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+            <div style={{ background: "#f5f5f5", borderRadius: 4, padding: "8px 16px", fontSize: 12, color: "#555" }}>
+              工程管理費（{quote.managementFeeValue}{quote.managementFeeMode === "percent" ? "%" : ""}）：${fmt(summary.managementFee)}
+              {summary.managementFeeDiscount > 0 && <span style={{ color: "#c0675a", marginLeft: 6 }}>（整價折讓 ${fmt(summary.managementFeeDiscount)}）</span>}
+            </div>
+            {quote.taxRate > 0 && (
+              <div style={{ background: "#f5f5f5", borderRadius: 4, padding: "8px 16px", fontSize: 12, color: "#555" }}>
+                稅金（{quote.taxRate}%）：${fmt(summary.taxAmount)}
+              </div>
+            )}
+            <div style={{ background: "#f5f5f5", borderRadius: 4, padding: "8px 16px", fontSize: 12, fontWeight: 700, color: "#333" }}>
+              含稅總計：${fmt(summary.total)}
+            </div>
+          </div>
+        )}
+
+        {/* 品項明細表 */}
+        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 16 }}>
+          <thead>
+            <tr style={{ background: "#333", color: "#fff", fontSize: 11 }}>
+              <th style={{ ...cellC, color: "#fff", background: "#333", width: 30 }}>#</th>
+              <th style={{ ...cell, color: "#fff", background: "#333" }}>品項</th>
+              <th style={{ ...cellC, color: "#fff", background: "#333", width: 40 }}>單位</th>
+              <th style={{ ...cellC, color: "#fff", background: "#333", width: 44 }}>數量</th>
+              <th style={{ ...cellR, color: "#fff", background: "#333", width: 70 }}>成本單價</th>
+              <th style={{ ...cellC, color: "#fff", background: "#333", width: 44 }}>倍率</th>
+              <th style={{ ...cellR, color: "#fff", background: "#333", width: 70 }}>報價單價</th>
+              <th style={{ ...cellR, color: "#fff", background: "#333", width: 80 }}>成本小計</th>
+              <th style={{ ...cellR, color: "#fff", background: "#333", width: 100 }}>毛利</th>
+            </tr>
+          </thead>
+          {isIntegrated ? renderIntegratedRows() : (
+            <tbody>
+              {items.map((it, i) => renderItemRow(it, i))}
+            </tbody>
+          )}
+          <tfoot>
+            <tr style={{ background: "#f5f5f5", fontWeight: 700 }}>
+              <td colSpan={7} style={{ ...cellR, color: "#555", fontWeight: 600 }}>合計</td>
+              <td style={{ ...cellR, fontWeight: 700 }}>${fmt(totalCost)}</td>
+              <td style={{ ...cellR, fontWeight: 700, color: totalProfit >= 0 ? "#5a8f6a" : "#c0675a" }}>
+                +${fmt(totalProfit)} ({marginPct}%)
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+
+        {/* 內部備註 */}
+        {quote.internalNote && (
+          <div style={{ marginTop: 16, padding: "12px 16px", background: "#fffef5", border: "1px solid #f0e8cc", borderRadius: 4 }}>
+            <div style={{ fontSize: 11, color: "#c9a84c", fontWeight: 600, marginBottom: 4 }}>內部備註</div>
+            <div style={{ fontSize: 12, color: "#555", whiteSpace: "pre-line" }}>{quote.internalNote}</div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
 // ─── 設定頁 ─────────────────────────────────────────────────
 function SettingsPage({ settings, onSave }) {
