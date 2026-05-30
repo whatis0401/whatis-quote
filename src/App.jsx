@@ -397,6 +397,7 @@ export default function App() {
         ["bank_accounts","engineering_groups","engineering_categories","term_templates"].forEach(k => {
           if (s[k]) try { s[k] = JSON.parse(s[k]); } catch { s[k] = []; }
         });
+        if (s.print_layout) try { s.print_layout = JSON.parse(s.print_layout); } catch { s.print_layout = null; }
         setSettings(s);
       } catch (e) {
         setNotification({ msg: "載入失敗：" + e.message, type: "error" });
@@ -1586,8 +1587,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
   const bankAccount = (settings.bank_accounts || []).find(b => b.id === quote.bankAccountId);
 
   // ─── 即時調整面板 state ───────────────────────────────────
-  const [showAdjust, setShowAdjust] = useState(false);
-  const [adj, setAdj] = useState({
+  const defaultAdj = {
     logoWidth: 170,
     logoGap: 20,
     companyFontSize: 14,
@@ -1595,13 +1595,36 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
     titleFontSize: 14,
     titleLetterSpacing: 3,
     headerMarginBottom: 19,
-    footerColumnGap: 16,
-    footerFontSize: 12,
-    footerTitleFontSize: 12,
-    signatureHeight: 70,
-    signatureMarginTop: 24,
+    footerColumnGap: 40,
+    footerFontSize: 13,
+    footerTitleFontSize: 14,
+    signatureHeight: 100,
+    signatureMarginTop: 35,
+  };
+  const [showAdjust, setShowAdjust] = useState(false);
+  const [adj, setAdj] = useState(() => {
+    const saved = settings.print_layout;
+    if (saved && typeof saved === "object") return { ...defaultAdj, ...saved };
+    return defaultAdj;
   });
+  const [adjSaving, setAdjSaving] = useState(false);
   function setA(key, val) { setAdj(prev => ({ ...prev, [key]: Number(val) })); }
+
+  async function saveAdj() {
+    setAdjSaving(true);
+    try {
+      const serialSettings = { ...settings };
+      ["bank_accounts","engineering_groups","engineering_categories","term_templates"].forEach(k => {
+        if (Array.isArray(serialSettings[k])) serialSettings[k] = JSON.stringify(serialSettings[k]);
+      });
+      serialSettings.print_layout = JSON.stringify(adj);
+      await sheetPut("Settings", [["key","value"], ...Object.entries(serialSettings)]);
+    } catch(e) {
+      console.error(e);
+    } finally {
+      setAdjSaving(false);
+    }
+  }
 
   useEffect(() => {
     const style = document.createElement("style");
@@ -2103,11 +2126,25 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
           ))}
 
           <div style={{ borderTop: "1px solid #eee", paddingTop: 14, marginTop: 4 }}>
-            <div style={{ fontSize: 11, color: "#aaa", marginBottom: 8 }}>調整滿意後，把以下數值貼給 Claude：</div>
+            <div style={{ fontSize: 11, color: "#aaa", marginBottom: 8 }}>調整滿意後點下方儲存，設定會同步到所有裝置：</div>
+            <button
+              onClick={saveAdj}
+              disabled={adjSaving}
+              style={{
+                ...S.btn,
+                width: "100%",
+                marginBottom: 10,
+                background: adjSaving ? "#aaa" : "#333",
+                fontSize: 12,
+              }}
+            >
+              {adjSaving ? "儲存中…" : "✓ 儲存版面設定"}
+            </button>
+            <div style={{ fontSize: 10, color: "#bbb", marginBottom: 8 }}>或把數值複製給 Claude：</div>
             <textarea
               readOnly
               value={JSON.stringify(adj, null, 2)}
-              style={{ width: "100%", height: 160, fontSize: 10, color: "#555", border: "1px solid #eee", borderRadius: 4, padding: 8, resize: "none", fontFamily: "monospace", boxSizing: "border-box" }}
+              style={{ width: "100%", height: 120, fontSize: 10, color: "#555", border: "1px solid #eee", borderRadius: 4, padding: 8, resize: "none", fontFamily: "monospace", boxSizing: "border-box" }}
               onClick={e => e.target.select()}
             />
           </div>
