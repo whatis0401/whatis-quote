@@ -1595,6 +1595,11 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
     titleFontSize: 14,
     titleLetterSpacing: 3,
     headerMarginBottom: 19,
+    footerColumnGap: 16,
+    footerFontSize: 12,
+    footerTitleFontSize: 12,
+    signatureHeight: 70,
+    signatureMarginTop: 24,
   });
   function setA(key, val) { setAdj(prev => ({ ...prev, [key]: Number(val) })); }
 
@@ -1987,11 +1992,11 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
   function PrintFooter({ quote, settings, bankAccount, isClient }) {
     return (
       <div style={{ borderTop: "1px solid #ddd", paddingTop: 16, marginTop: 8, fontFamily: bodyFont }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, fontSize: 12, marginBottom: 32 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: adj.footerColumnGap, fontSize: adj.footerFontSize, marginBottom: 32 }}>
           {/* 備註 */}
           {quote.terms && (
             <div>
-              <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 12 }}>備註</div>
+              <div style={{ fontWeight: 600, marginBottom: 6, fontSize: adj.footerTitleFontSize }}>備註</div>
               <div style={{ color: "#555", whiteSpace: "pre-line", lineHeight: 1.8 }}>{quote.terms}</div>
             </div>
           )}
@@ -2000,7 +2005,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
           <div>
             {/* 公司資訊 */}
             <div style={{ marginBottom: 12 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 12 }}>公司資訊</div>
+              <div style={{ fontWeight: 600, marginBottom: 4, fontSize: adj.footerTitleFontSize }}>公司資訊</div>
               <div style={{ color: "#555", lineHeight: 1.8 }}>
                 {settings.company_name} / {settings.company_tax_id}<br />
                 {settings.company_address} / {settings.company_phone}
@@ -2011,7 +2016,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
             {/* 匯款帳戶 */}
             {quote.showBankAccount && bankAccount && (
               <div>
-                <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 12 }}>匯款帳戶</div>
+                <div style={{ fontWeight: 600, marginBottom: 4, fontSize: adj.footerTitleFontSize }}>匯款帳戶</div>
                 <div style={{ color: "#555", lineHeight: 1.8 }}>
                   {bankAccount.bankName} {bankAccount.branchName}({bankAccount.bankCode})<br />
                   戶名：{bankAccount.accountName}<br />
@@ -2022,15 +2027,15 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
           </div>
         </div>
 
-        {/* 客戶簽章 / 經辦人（獨立於下方，留簽名空間）*/}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, marginTop: 24 }}>
+        {/* 客戶簽章 / 經辦人 */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, marginTop: adj.signatureMarginTop }}>
           <div>
             <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>客戶簽章</div>
-            <div style={{ height: 70, border: "1px solid #ddd", borderRadius: 4, background: "#fafafa" }} />
+            <div style={{ height: adj.signatureHeight, border: "1px solid #ddd", borderRadius: 4, background: "#fafafa" }} />
           </div>
           <div>
             <div style={{ fontSize: 11, color: "#888", marginBottom: 4 }}>經辦人</div>
-            <div style={{ height: 70, border: "1px solid #ddd", borderRadius: 4, background: "#fafafa" }} />
+            <div style={{ height: adj.signatureHeight, border: "1px solid #ddd", borderRadius: 4, background: "#fafafa" }} />
           </div>
         </div>
       </div>
@@ -2078,6 +2083,11 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
             { key: "titleFontSize", label: "「工程報價單」字體大小", min: 10, max: 32, unit: "px" },
             { key: "titleLetterSpacing", label: "「工程報價單」字距", min: 0, max: 20, unit: "px" },
             { key: "headerMarginBottom", label: "抬頭下方間距", min: 0, max: 48, unit: "px" },
+            { key: "footerColumnGap", label: "備註與公司資訊間距", min: 8, max: 80, unit: "px" },
+            { key: "footerFontSize", label: "底部內文字體大小", min: 10, max: 18, unit: "px" },
+            { key: "footerTitleFontSize", label: "底部標題字體大小", min: 10, max: 18, unit: "px" },
+            { key: "signatureHeight", label: "簽章框高度", min: 40, max: 150, unit: "px" },
+            { key: "signatureMarginTop", label: "簽章區上方間距", min: 0, max: 60, unit: "px" },
           ].map(({ key, label, min, max, unit }) => (
             <div key={key} style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
