@@ -1600,6 +1600,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
     footerTitleFontSize: 14,
     signatureHeight: 100,
     signatureMarginTop: 35,
+    totalColor: "#c0522a",
   };
   const [showAdjust, setShowAdjust] = useState(false);
   const [adj, setAdj] = useState(() => {
@@ -1819,7 +1820,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
               )}
               <tr style={{ fontWeight: 700, fontSize: 15 }}>
                 <td style={{ ...label, borderTop: "2px solid #333" }}>含稅</td>
-                <td style={{ ...amount, borderTop: "2px solid #333", color: "#c0522a" }}>${fmt(summary.total)}</td>
+                <td style={{ ...amount, borderTop: "2px solid #333", color: adj.totalColor }}>${fmt(summary.total)}</td>
               </tr>
             </tbody>
           </table>
@@ -1993,7 +1994,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
               )}
               <tr style={{ fontWeight: 700 }}>
                 <td style={{ padding: "6px 10px", borderTop: "2px solid #333" }}>總計</td>
-                <td style={{ padding: "6px 10px", textAlign: "right", borderTop: "2px solid #333", fontSize: 16, color: "#c0522a" }}>
+                <td style={{ padding: "6px 10px", textAlign: "right", borderTop: "2px solid #333", fontSize: 16, color: adj.totalColor }}>
                   {fmt(summary.total)}
                 </td>
               </tr>
@@ -2124,6 +2125,40 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
               />
             </div>
           ))}
+
+          {/* 顏色選擇 */}
+          <div style={{ marginBottom: 14, borderTop: "1px solid #f0f0f0", paddingTop: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: "#555", marginBottom: 10 }}>顏色設定</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: "#888" }}>總計金額顏色</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: 24, height: 24, borderRadius: 4, background: adj.totalColor, border: "1px solid #ddd" }} />
+                <input
+                  type="color"
+                  value={adj.totalColor}
+                  onChange={e => setAdj(prev => ({ ...prev, totalColor: e.target.value }))}
+                  style={{ width: 40, height: 28, border: "1px solid #ddd", borderRadius: 4, cursor: "pointer", padding: 2 }}
+                />
+                <span style={{ fontSize: 10, color: "#aaa", fontFamily: "monospace" }}>{adj.totalColor}</span>
+              </div>
+            </div>
+            {/* 快速預設顏色 */}
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {["#c0522a","#4a8fa8","#5a8f6a","#7a6fa8","#888888","#2a6496","#4a7c6f"].map(c => (
+                <button
+                  key={c}
+                  onClick={() => setAdj(prev => ({ ...prev, totalColor: c }))}
+                  style={{
+                    width: 24, height: 24, borderRadius: 4,
+                    background: c,
+                    border: adj.totalColor === c ? "2px solid #333" : "1px solid #ddd",
+                    cursor: "pointer", padding: 0,
+                  }}
+                  title={c}
+                />
+              ))}
+            </div>
+          </div>
 
           <div style={{ borderTop: "1px solid #eee", paddingTop: 14, marginTop: 4 }}>
             <div style={{ fontSize: 11, color: "#aaa", marginBottom: 8 }}>調整滿意後點下方儲存，設定會同步到所有裝置：</div>
