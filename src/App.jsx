@@ -1607,6 +1607,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
         .print-page { margin: 0; padding: 0; }
         #sidebar { display: none !important; }
         #main-content { margin-left: 0 !important; padding: 0 !important; }
+        @page { margin: 10mm; }
       }
     `;
     document.head.appendChild(style);
@@ -1645,7 +1646,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
           <div style={{ display: "flex", alignItems: "baseline" }}>
             <span style={{ color: "#888", width: 70, flexShrink: 0 }}>工程名稱</span>
             <span style={{ color: "#888", marginRight: 12 }}>/</span>
-            <span style={{ fontWeight: 600 }}>{quote.projectName || quote.name}</span>
+            <span style={{ fontWeight: 400 }}>{quote.projectName || quote.name}</span>
           </div>
           {quote.projectAddress && (
             <div style={{ display: "flex", alignItems: "baseline" }}>
