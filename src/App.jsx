@@ -1636,7 +1636,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
         #sidebar { display: none !important; }
         #main-content { margin-left: 0 !important; padding: 0 !important; }
         .print-content { margin-top: 0 !important; background: #fff !important; padding: 0 !important; }
-        .print-card { width: 100% !important; margin: 0 !important; box-shadow: none !important; background: #fff !important; }
+        .print-card { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 20px !important; box-shadow: none !important; background: #fff !important; box-sizing: border-box !important; }
         .print-wrap { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; }
         @page { margin: 10mm; size: A4 portrait; }
       }
@@ -2198,15 +2198,15 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
         {/* 整合式：總表 + 明細各自一頁 */}
         {isIntegrated ? (
           <>
-            <div className="print-card" style={{ background: "#fff", width: 794, margin: "0 auto 24px", padding: "40px 48px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            <div className="print-card" style={{ background: "#fff", width: 794, maxWidth: "100%", margin: "0 auto 24px", padding: "40px 48px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", boxSizing: "border-box" }}>
               <SummaryPage />
             </div>
-            <div className="print-card" style={{ background: "#fff", width: 794, margin: "0 auto", padding: "40px 48px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+            <div className="print-card" style={{ background: "#fff", width: 794, maxWidth: "100%", margin: "0 auto", padding: "40px 48px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", boxSizing: "border-box" }}>
               <DetailPage groupData={integratedData} />
             </div>
           </>
         ) : (
-          <div className="print-card" style={{ background: "#fff", width: 794, margin: "0 auto", padding: "40px 48px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" }}>
+          <div className="print-card" style={{ background: "#fff", width: 794, maxWidth: "100%", margin: "0 auto", padding: "40px 48px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)", boxSizing: "border-box" }}>
             <IndependentPage />
           </div>
         )}
