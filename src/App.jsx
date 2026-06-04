@@ -1449,6 +1449,16 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
     onChange(next.map((it, i) => ({ ...it, sortOrder: i })));
   }
 
+  function reorderItem(sourceId, targetId) {
+    const srcIdx = items.findIndex(it => it.id === sourceId);
+    const tgtIdx = items.findIndex(it => it.id === targetId);
+    if (srcIdx < 0 || tgtIdx < 0 || srcIdx === tgtIdx) return;
+    const next = [...items];
+    const [moved] = next.splice(srcIdx, 1);
+    next.splice(tgtIdx, 0, moved);
+    onChange(next.map((it, i) => ({ ...it, sortOrder: i })));
+  }
+
   // 獨立品項：直接顯示列表
   if (!isIntegrated) {
     const showPosition = true;
@@ -1479,6 +1489,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
           onUpdate={updateItem}
           onRemove={removeItem}
           onMove={moveItem}
+                      onReorder={reorderItem}
         />
       </div>
     );
@@ -1570,6 +1581,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
                       onUpdate={updateItem}
                       onRemove={removeItem}
                       onMove={moveItem}
+                      onReorder={reorderItem}
                     />
                   )}
                 </div>
@@ -1585,6 +1597,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
                 onUpdate={updateItem}
                 onRemove={removeItem}
                 onMove={moveItem}
+                      onReorder={reorderItem}
               />
             )}
           </div>
@@ -1602,6 +1615,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
             onUpdate={updateItem}
             onRemove={removeItem}
             onMove={moveItem}
+                      onReorder={reorderItem}
           />
         </div>
       )}
@@ -1650,15 +1664,26 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
 }
 
 // ─── 品項表格 ───────────────────────────────────────────────
-function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove, onMove }) {
+function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove, onMove, onReorder }) {
   const colWidths = showPosition
-    ? "60px 60px 1fr 60px 80px 90px 90px 90px 90px 80px 50px"
-    : "60px 1fr 60px 80px 90px 90px 90px 90px 80px 50px";
+    ? "24px 60px 60px 1fr 60px 80px 90px 90px 90px 90px 80px 50px"
+    : "24px 60px 1fr 60px 80px 90px 90px 90px 90px 80px 50px";
 
-  const headers = [
-    ...(showPosition ? ["位置"] : []),
-    "項次", "工程細項", "單位", "數量", "成本", "倍率", "單價", "金額", "備註", "",
-  ];
+  const [dragOverId, setDragOverId] = useState(null);
+
+  function handleDragOver(e, targetId) {
+    e.preventDefault();
+    setDragOverId(targetId);
+  }
+
+  function handleDrop(e, targetId) {
+    e.preventDefault();
+    const sourceId = e.dataTransfer.getData("itemId");
+    if (sourceId && sourceId !== targetId && onReorder) {
+      onReorder(sourceId, targetId);
+    }
+    setDragOverId(null);
+  }
 
   return (
     <div style={{ fontSize: 13 }}>
@@ -1673,6 +1698,7 @@ function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove,
         borderBottom: "1px solid #eee",
         gap: 6,
       }}>
+        <div></div>
         {showPosition && <div>位置</div>}
         <div>#</div>
         <div>工程細項</div>
@@ -1693,10 +1719,14 @@ function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove,
           index={idx + 1}
           showPosition={showPosition}
           colWidths={colWidths}
+          isDragOver={dragOverId === it.id}
           onUpdate={(patch) => onUpdate(it.id, patch)}
           onRemove={() => onRemove(it.id)}
           onMoveUp={() => onMove(it.id, "up")}
           onMoveDown={() => onMove(it.id, "down")}
+          onDragOver={(e) => handleDragOver(e, it.id)}
+          onDrop={(e) => handleDrop(e, it.id)}
+          onDragLeave={() => setDragOverId(null)}
         />
       ))}
 
@@ -1709,9 +1739,9 @@ function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove,
   );
 }
 
-function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onMoveUp, onMoveDown }) {
+function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onMoveUp, onMoveDown, onDragOver, onDrop, onDragLeave, isDragOver }) {
   const [hover, setHover] = useState(false);
-  const [priceRef, setPriceRef] = useState(null); // 行情參考資料
+  const [priceRef, setPriceRef] = useState(null);
   const [searching, setSearching] = useState(false);
 
   async function handleNameBlur(name) {
@@ -1747,18 +1777,29 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
 
   return (
     <div
+      draggable
+      onDragStart={e => e.dataTransfer.setData("itemId", item.id)}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragLeave={onDragLeave}
       style={{
         display: "grid",
         gridTemplateColumns: colWidths,
         padding: "4px 8px",
         alignItems: "center",
-        borderBottom: "1px solid #f5f5f5",
-        background: hover ? "#fafafa" : "transparent",
+        borderBottom: isDragOver ? "2px solid #888" : "1px solid #f5f5f5",
+        background: isDragOver ? "#f5f5f3" : hover ? "#fafafa" : "transparent",
         gap: 6,
+        transition: "background 0.1s",
       }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
+      {/* 拖拉把手 */}
+      <div style={{
+        cursor: "grab", color: "#ccc", fontSize: 14, textAlign: "center",
+        userSelect: "none", lineHeight: 1,
+      }} title="拖拉排序">⠿</div>
       {showPosition && (
         <input
           style={inputStyle}
@@ -2570,16 +2611,16 @@ function InternalCostView({ quote, items, summary, settings, isIntegrated }) {
             {catIds.map(catId => {
               const cat = categories.find(c => c.id === catId);
               const catItems = gItems.filter(it => it.category === catId);
-              return (
-                <React.Fragment key={catId}>
-                  <tr>
-                    <td colSpan={9} style={{ ...cell, background: "#fafafa", fontWeight: 600, paddingLeft: 20, color: "#555" }}>
-                      {cat ? cat.name : "其他"}
-                    </td>
-                  </tr>
-                  {catItems.map((it, i) => renderItemRow(it, i))}
-                </React.Fragment>
+              const rows = [];
+              rows.push(
+                <tr key={`header-${catId}`}>
+                  <td colSpan={9} style={{ ...cell, background: "#fafafa", fontWeight: 600, paddingLeft: 20, color: "#555" }}>
+                    {cat ? cat.name : "其他"}
+                  </td>
+                </tr>
               );
+              catItems.forEach((it, i) => rows.push(renderItemRow(it, i)));
+              return rows;
             })}
           </tbody>
         );
