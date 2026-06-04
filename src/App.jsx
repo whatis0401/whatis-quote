@@ -66,6 +66,14 @@ async function gasAction(action, params) {
   return r.json();
 }
 
+async function searchPriceDB(keyword) {
+  return gasAction("searchPriceDB", { keyword });
+}
+
+async function savePriceDB(items) {
+  return gasAction("savePriceDB", { items });
+}
+
 // ─── 資料轉換 ───────────────────────────────────────────────
 function rowsToQuotes(rows) {
   if (!rows || rows.length < 2) return [];
@@ -1180,11 +1188,226 @@ function SummaryPreview({ summary, quote }) {
   );
 }
 
+// ─── AI 詢問面板 ─────────────────────────────────────────────
+function AiQueryPanel({ categoryName, groupName, onAddItems, onClose }) {
+  const [query, setQuery] = useState(`${groupName} / ${categoryName} / `);
+  const [pasteText, setPasteText] = useState("");
+  const [parsedItems, setParsedItems] = useState([]);
+  const [parseError, setParseError] = useState("");
+  const [step, setStep] = useState("query"); // query | paste | review
+
+  // 組建提示詞
+  const promptText = `我是台灣室內設計師，需要報價以下品項，請用表格回覆，欄位為：品項名稱、單位、數量、成本單價（台灣市場2024-2025行情）、建議利潤乘數（1.3~1.6之間）、備註。
+
+品項：${query}
+
+要求：
+1. 拆解成完整的施工細項（例如桶身、門片、五金、安裝工資等）
+2. 成本單價為台灣市場實際行情（不含利潤）
+3. 建議乘數依工種難度設定（簡單工種1.3、中等1.4、複雜1.5-1.6）
+4. 只輸出表格，不要其他說明文字`;
+
+  function handleCopyAndOpen() {
+    navigator.clipboard.writeText(promptText).catch(() => {});
+    window.open("https://claude.ai", "_blank");
+    setStep("paste");
+  }
+
+  function handleParse() {
+    setParseError("");
+    const lines = pasteText.trim().split("\n").filter(l => l.trim() && !l.startsWith("---"));
+    const items = [];
+
+    for (const line of lines) {
+      const parts = line.split("|").map(s => s.trim()).filter(Boolean);
+      if (parts.length < 4) continue;
+      // 跳過表頭行
+      if (parts[0].includes("品項") || parts[0].includes("名稱") || parts[0] === "#") continue;
+
+      const itemName = parts[0] || "";
+      const unit = parts[1] || "式";
+      const qty = parseFloat(parts[2]) || 1;
+      const cost = parseFloat(parts[3]?.replace(/,/g, "")) || 0;
+      const multiplier = parseFloat(parts[4]) || 1.4;
+      const note = parts[5] || "";
+
+      if (itemName && cost > 0) {
+        items.push({
+          id: genId(),
+          itemName,
+          unit,
+          qty,
+          cost,
+          multiplier,
+          price: Math.round(cost * multiplier),
+          priceOverride: false,
+          note,
+          selected: true,
+        });
+      }
+    }
+
+    if (items.length === 0) {
+      setParseError("無法解析表格，請確認格式是否為以 | 分隔的表格");
+      return;
+    }
+    setParsedItems(items);
+    setStep("review");
+  }
+
+  function toggleItem(id) {
+    setParsedItems(prev => prev.map(it => it.id === id ? { ...it, selected: !it.selected } : it));
+  }
+
+  function updateParsedItem(id, patch) {
+    setParsedItems(prev => prev.map(it => it.id === id ? { ...it, ...patch } : it));
+  }
+
+  function handleAddSelected() {
+    const selected = parsedItems.filter(it => it.selected);
+    if (selected.length === 0) return;
+    onAddItems(selected);
+    onClose();
+  }
+
+  return (
+    <div style={{
+      position: "fixed", top: 0, right: 0, bottom: 0, width: 480,
+      background: "#fff", borderLeft: "1px solid #e0e0e0",
+      boxShadow: "-4px 0 16px rgba(0,0,0,0.08)",
+      zIndex: 200, display: "flex", flexDirection: "column",
+      fontFamily: '"微軟正黑體","Microsoft JhengHei","PingFang TC",sans-serif',
+    }}>
+      {/* 標題列 */}
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>報價參考詢問</div>
+          <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{groupName} / {categoryName}</div>
+        </div>
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa", padding: "4px 8px" }}>✕</button>
+      </div>
+
+      <div style={{ flex: 1, overflow: "auto", padding: "20px" }}>
+
+        {/* Step 1：輸入品項 */}
+        {step === "query" && (
+          <div>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
+              描述你要詢問的品項（位置 / 工種 / 品項名稱 + 尺寸規格）
+            </div>
+            <textarea
+              style={{
+                ...S.input, height: 80, resize: "none", marginBottom: 12,
+                fontSize: 13, lineHeight: 1.6,
+              }}
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder={`例：主臥室 / 系統櫃工程 / 高櫃體 W90×H240×D60`}
+            />
+            <div style={{ fontSize: 12, color: "#aaa", marginBottom: 16, padding: "10px 12px", background: "#f9f9f9", borderRadius: 4, lineHeight: 1.7 }}>
+              點「開始詢問」後，系統會自動複製提示詞並開啟 Claude.ai。
+              貼上提示詞（Ctrl+V）→ 取得回覆 → 複製表格回來。
+            </div>
+            <button style={{ ...S.btn, width: "100%" }} onClick={handleCopyAndOpen}>
+              開始詢問（複製提示詞 + 開啟 Claude.ai）
+            </button>
+          </div>
+        )}
+
+        {/* Step 2：貼上回覆 */}
+        {step === "paste" && (
+          <div>
+            <div style={{ fontSize: 12, color: "#6aaa8a", marginBottom: 12, padding: "10px 12px", background: "#f0f8f4", borderRadius: 4 }}>
+              ✓ 提示詞已複製到剪貼簿，請到 Claude.ai 貼上後，把回覆的表格複製回來
+            </div>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>將 Claude 回覆的表格貼到下方：</div>
+            <textarea
+              style={{ ...S.input, height: 200, resize: "vertical", fontSize: 12, fontFamily: "monospace" }}
+              value={pasteText}
+              onChange={e => setPasteText(e.target.value)}
+              placeholder={"品項名稱 | 單位 | 數量 | 成本單價 | 建議乘數 | 備註\n桶身（塑合板） | 才 | 48 | 280 | 1.4 | ...\n..."}
+            />
+            {parseError && <div style={{ fontSize: 12, color: "#c0675a", marginTop: 6 }}>{parseError}</div>}
+            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+              <button style={S.btnSecondary} onClick={() => setStep("query")}>← 重新詢問</button>
+              <button style={{ ...S.btn, flex: 1 }} onClick={handleParse} disabled={!pasteText.trim()}>
+                解析表格
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3：確認品項 */}
+        {step === "review" && (
+          <div>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 12 }}>
+              解析出 {parsedItems.length} 個品項，勾選要加入的，可直接修改數值：
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {parsedItems.map(it => (
+                <div key={it.id} style={{
+                  border: `1px solid ${it.selected ? "#ccc" : "#f0f0f0"}`,
+                  borderRadius: 4, padding: "10px 12px",
+                  background: it.selected ? "#fff" : "#fafafa",
+                  opacity: it.selected ? 1 : 0.5,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <input type="checkbox" checked={it.selected} onChange={() => toggleItem(it.id)} />
+                    <input
+                      style={{ ...S.input, fontSize: 13, fontWeight: 600 }}
+                      value={it.itemName}
+                      onChange={e => updateParsedItem(it.id, { itemName: e.target.value })}
+                    />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6 }}>
+                    {[
+                      { label: "單位", key: "unit", type: "text" },
+                      { label: "數量", key: "qty", type: "number" },
+                      { label: "成本單價", key: "cost", type: "number" },
+                      { label: "乘數", key: "multiplier", type: "number" },
+                    ].map(f => (
+                      <div key={f.key}>
+                        <div style={{ fontSize: 10, color: "#aaa", marginBottom: 2 }}>{f.label}</div>
+                        <input
+                          style={{ ...S.input, fontSize: 12, padding: "4px 8px" }}
+                          type={f.type}
+                          value={it[f.key]}
+                          onChange={e => updateParsedItem(it.id, { [f.key]: f.type === "number" ? toNum(e.target.value) : e.target.value })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>
+                    報價單價：${fmt(Math.round(toNum(it.cost) * toNum(it.multiplier)))} · 備註：{it.note || "—"}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button style={S.btnSecondary} onClick={() => setStep("paste")}>← 重新貼上</button>
+              <button
+                style={{ ...S.btn, flex: 1 }}
+                onClick={handleAddSelected}
+                disabled={!parsedItems.some(it => it.selected)}
+              >
+                加入報價單（{parsedItems.filter(it => it.selected).length} 項）
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── 品項編輯器 ─────────────────────────────────────────────
 function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTemplate }) {
   const isIntegrated = quote.type === "integrated";
   const groups = settings.engineering_groups || [];
   const categories = settings.engineering_categories || [];
+
+  // AI 詢問面板狀態
+  const [aiPanel, setAiPanel] = useState(null); // { groupName, categoryName, groupId, categoryId }
 
   function addItem(group, category) {
     const newItem = {
@@ -1330,6 +1553,10 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
                       {catItems.length > 0 && <span style={{ fontSize: 12, color: "#888" }}>${fmt(catTotal)}</span>}
                       <button
                         style={{ ...S.btnSecondary, padding: "4px 10px", fontSize: 12 }}
+                        onClick={() => setAiPanel({ groupName: g.name, categoryName: cat.name, groupId: g.id, categoryId: cat.id })}
+                      >詢問</button>
+                      <button
+                        style={{ ...S.btnSecondary, padding: "4px 10px", fontSize: 12 }}
                         onClick={() => addItem(g.id, cat.id)}
                       >＋ 新增</button>
                     </div>
@@ -1388,6 +1615,36 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
         ))}
         <button style={S.btnSecondary} onClick={() => addItem("", "")}>＋ 其他品項</button>
       </div>
+
+      {/* AI 詢問面板 */}
+      {aiPanel && (
+        <AiQueryPanel
+          groupName={aiPanel.groupName}
+          categoryName={aiPanel.categoryName}
+          onAddItems={(newItems) => {
+            const toAdd = newItems.map((it, i) => ({
+              id: genId(),
+              quoteId: quote.id,
+              group: aiPanel.groupId,
+              category: aiPanel.categoryId,
+              position: "",
+              itemName: it.itemName,
+              unit: it.unit || "式",
+              qty: toNum(it.qty) || 1,
+              cost: toNum(it.cost),
+              multiplier: toNum(it.multiplier) || 1.4,
+              price: Math.round(toNum(it.cost) * (toNum(it.multiplier) || 1.4)),
+              priceOverride: false,
+              total: Math.round(toNum(it.cost) * (toNum(it.multiplier) || 1.4) * (toNum(it.qty) || 1)),
+              note: it.note || "",
+              sortOrder: items.length + i,
+              updatedAt: now(),
+            }));
+            onChange([...items, ...toAdd]);
+          }}
+          onClose={() => setAiPanel(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1454,6 +1711,25 @@ function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove,
 
 function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onMoveUp, onMoveDown }) {
   const [hover, setHover] = useState(false);
+  const [priceRef, setPriceRef] = useState(null); // 行情參考資料
+  const [searching, setSearching] = useState(false);
+
+  async function handleNameBlur(name) {
+    if (!name || name.length < 3) return;
+    setSearching(true);
+    try {
+      const res = await searchPriceDB(name);
+      if (res.results && res.results.length > 0) {
+        setPriceRef(res.results);
+      } else {
+        setPriceRef(null);
+      }
+    } catch (e) {
+      setPriceRef(null);
+    } finally {
+      setSearching(false);
+    }
+  }
   const inputStyle = {
     border: "1px solid transparent",
     borderRadius: 3,
@@ -1494,14 +1770,58 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
         />
       )}
       <div style={{ color: "#bbb", fontSize: 12, textAlign: "center" }}>{index}</div>
-      <input
-        style={inputStyle}
-        value={item.itemName}
-        onChange={e => onUpdate({ itemName: e.target.value })}
-        onFocus={e => e.target.style.borderColor = "#ddd"}
-        onBlur={e => e.target.style.borderColor = "transparent"}
-        placeholder="工程細項名稱"
-      />
+      <div style={{ position: "relative" }}>
+        <input
+          style={inputStyle}
+          value={item.itemName}
+          onChange={e => { onUpdate({ itemName: e.target.value }); setPriceRef(null); }}
+          onFocus={e => e.target.style.borderColor = "#ddd"}
+          onBlur={e => { e.target.style.borderColor = "transparent"; handleNameBlur(e.target.value); }}
+          placeholder="工程細項名稱"
+        />
+        {searching && <span style={{ position: "absolute", right: 4, top: 4, fontSize: 10, color: "#aaa" }}>搜尋中…</span>}
+        {priceRef && priceRef.length > 0 && (
+          <div style={{
+            position: "absolute", left: 0, top: "100%", zIndex: 50,
+            background: "#fff", border: "1px solid #e0e0e0", borderRadius: 4,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)", minWidth: 320,
+            fontSize: 12,
+          }}>
+            <div style={{ padding: "6px 12px", fontSize: 11, color: "#aaa", borderBottom: "1px solid #f0f0f0" }}>
+              行情參考（點擊套用）
+            </div>
+            {priceRef.map((ref, i) => (
+              <div
+                key={i}
+                style={{ padding: "8px 12px", cursor: "pointer", borderBottom: "1px solid #f5f5f5" }}
+                onMouseEnter={e => e.currentTarget.style.background = "#f9f9f9"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                onClick={() => {
+                  onUpdate({
+                    itemName: ref.itemName,
+                    unit: ref.unit || item.unit,
+                    cost: toNum(ref.costAvg) || item.cost,
+                    multiplier: toNum(ref.multiplierSuggested) || item.multiplier,
+                    priceOverride: false,
+                  });
+                  setPriceRef(null);
+                }}
+              >
+                <div style={{ fontWeight: 500, marginBottom: 2 }}>{ref.itemName}</div>
+                <div style={{ color: "#888", fontSize: 11 }}>
+                  {ref.unit} · 成本均價 ${fmt(ref.costAvg)}
+                  {ref.multiplierSuggested && ` · 建議乘數 ${ref.multiplierSuggested}`}
+                  {ref.caseDate && ` · ${ref.caseDate}`}
+                </div>
+              </div>
+            ))}
+            <div
+              style={{ padding: "6px 12px", fontSize: 11, color: "#aaa", cursor: "pointer", textAlign: "center" }}
+              onClick={() => setPriceRef(null)}
+            >關閉</div>
+          </div>
+        )}
+      </div>
       <input
         style={inputStyle}
         value={item.unit}
