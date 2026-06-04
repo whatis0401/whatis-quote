@@ -597,6 +597,32 @@ export default function App() {
                 setSaving(false);
               }
             }}
+            onDuplicate={(id) => {
+              const original = quotes.find(q => q.id === id);
+              if (!original) return;
+              const newId = genId();
+              const newQ = {
+                ...original,
+                id: newId,
+                name: original.name + "_複本",
+                status: "draft",
+                createdAt: now(),
+                updatedAt: now(),
+              };
+              const originalItems = allItems.filter(it => it.quoteId === id);
+              const newItems = originalItems.map(it => ({
+                ...it,
+                id: genId(),
+                quoteId: newId,
+                updatedAt: now(),
+              }));
+              const nextQ = [...quotes, newQ];
+              const nextI = [...allItems, ...newItems];
+              setQuotes(nextQ);
+              setAllItems(nextI);
+              scheduleSave(nextQ, nextI);
+              showNotif(`已複製為「${newQ.name}」`, "success");
+            }}
             onStatusChange={(id, status) => {
               const next = quotes.map(q => q.id === id ? { ...q, status, updatedAt: now() } : q);
               updateQuotes(next);
@@ -705,7 +731,7 @@ function Sidebar({ page, setPage }) {
 }
 
 // ─── 報價單列表 ─────────────────────────────────────────────
-function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onStatusChange }) {
+function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDuplicate, onStatusChange }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
@@ -856,6 +882,10 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onStat
                   </select>
                 </div>
                 <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                  <button
+                    style={{ ...S.btnSecondary, padding: "4px 10px", fontSize: 12 }}
+                    onClick={e => { e.stopPropagation(); onDuplicate(q.id); }}
+                  >複製</button>
                   <button
                     style={{ ...S.btnDanger, padding: "4px 10px", fontSize: 12 }}
                     onClick={e => { e.stopPropagation(); onDelete(q.id); }}
@@ -1737,7 +1767,23 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
   // AI 詢問面板狀態
   const [aiPanel, setAiPanel] = useState(null);
   // 匯入廠商報價面板狀態
-  const [importPanel, setImportPanel] = useState(null); // { groupName, categoryName, groupId, categoryId }
+  const [importPanel, setImportPanel] = useState(null);
+  // 批次倍率輸入狀態 { [catKey]: value }
+  const [batchMultipliers, setBatchMultipliers] = useState({});
+
+  function applyBatchMultiplier(groupId, catId) {
+    const key = `${groupId}||${catId}`;
+    const val = parseFloat(batchMultipliers[key]);
+    if (!val || val <= 0) return;
+    const updated = items.map(it => {
+      if (it.group === groupId && it.category === catId && it.unit !== "__section__") {
+        return { ...it, multiplier: val, priceOverride: false, updatedAt: now() };
+      }
+      return it;
+    });
+    onChange(updated);
+    setBatchMultipliers(prev => ({ ...prev, [key]: "" }));
+  } // { groupName, categoryName, groupId, categoryId }
 
   function addItem(group, category) {
     const newItem = {
@@ -1969,6 +2015,23 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
                     <div style={{ fontWeight: 600, fontSize: 13, color: "#444" }}>{cat.name}</div>
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                       {catItems.length > 0 && <span style={{ fontSize: 12, color: "#888" }}>${fmt(catTotal)}</span>}
+                      {/* 批次倍率 */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <input
+                          type="number"
+                          step="0.1"
+                          placeholder="批次倍率"
+                          value={batchMultipliers[`${g.id}||${cat.id}`] || ""}
+                          onChange={e => setBatchMultipliers(prev => ({ ...prev, [`${g.id}||${cat.id}`]: e.target.value }))}
+                          onKeyDown={e => e.key === "Enter" && applyBatchMultiplier(g.id, cat.id)}
+                          style={{ ...S.input, width: 80, padding: "4px 8px", fontSize: 12 }}
+                        />
+                        <button
+                          style={{ ...S.btnSecondary, padding: "4px 10px", fontSize: 12 }}
+                          onClick={() => applyBatchMultiplier(g.id, cat.id)}
+                          title="套用此倍率到所有品項"
+                        >套用</button>
+                      </div>
                       <button
                         style={{ ...S.btnSecondary, padding: "4px 10px", fontSize: 12 }}
                         onClick={() => setAiPanel({ groupName: g.name, categoryName: cat.name, groupId: g.id, categoryId: cat.id })}
