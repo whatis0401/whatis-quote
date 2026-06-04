@@ -1400,6 +1400,271 @@ function AiQueryPanel({ categoryName, groupName, onAddItems, onClose }) {
   );
 }
 
+// ─── 匯入廠商報價面板 ────────────────────────────────────────
+function ImportQuotePanel({ categoryName, groupName, onAddItems, onClose }) {
+  const [pasteText, setPasteText] = useState("");
+  const [parsedItems, setParsedItems] = useState([]);
+  const [parseError, setParseError] = useState("");
+  const [step, setStep] = useState("guide"); // guide | paste | review
+  const [batchMultiplier, setBatchMultiplier] = useState("");
+
+  const promptText = `請解析以下附件（廠商報價單），將所有品項整理成表格輸出。
+
+輸出格式（用 | 分隔欄位）：
+品項名稱 | 單位 | 數量 | 單價 | 總價 | 備註
+
+規則：
+1. 如果只有總價沒有單價，請自動計算：單價 = 總價 ÷ 數量
+2. 如果只有單價沒有總價，請自動計算：總價 = 單價 × 數量
+3. 數字去除千分位符號（逗號），只輸出純數字
+4. 第一行輸出欄位標題，之後每行一個品項
+5. 只輸出表格，不要其他說明文字`;
+
+  function handleCopyAndOpen() {
+    navigator.clipboard.writeText(promptText).catch(() => {});
+    window.open("https://claude.ai", "_blank");
+    setStep("paste");
+  }
+
+  function handleParse() {
+    setParseError("");
+    const lines = pasteText.trim().split("\n").filter(l => l.trim());
+    const items = [];
+
+    for (const line of lines) {
+      const parts = line.split("|").map(s => s.trim()).filter(Boolean);
+      if (parts.length < 3) continue;
+      // 跳過表頭
+      if (parts[0].includes("品項") || parts[0].includes("名稱") || parts[0] === "#") continue;
+
+      const itemName = parts[0] || "";
+      const unit = parts[1] || "式";
+      const qty = parseFloat(parts[2]?.replace(/,/g, "")) || 1;
+      let cost = parseFloat(parts[3]?.replace(/,/g, "")) || 0;
+      const totalPrice = parseFloat(parts[4]?.replace(/,/g, "")) || 0;
+      const note = parts[5] || "";
+
+      // 只有總價沒有單價時，自動計算
+      if (!cost && totalPrice && qty) {
+        cost = Math.round(totalPrice / qty);
+      }
+
+      if (itemName && (cost > 0 || totalPrice > 0)) {
+        items.push({
+          id: genId(),
+          itemName,
+          unit,
+          qty,
+          originalQty: qty,
+          cost,
+          multiplier: "",
+          note,
+          selected: true,
+        });
+      }
+    }
+
+    if (items.length === 0) {
+      setParseError("無法解析表格，請確認格式是否為以 | 分隔的表格，或重新複製 Claude 的回覆");
+      return;
+    }
+    setParsedItems(items);
+    setStep("review");
+  }
+
+  function toggleItem(id) {
+    setParsedItems(prev => prev.map(it => it.id === id ? { ...it, selected: !it.selected } : it));
+  }
+
+  function updateItem(id, patch) {
+    setParsedItems(prev => prev.map(it => {
+      if (it.id !== id) return it;
+      const updated = { ...it, ...patch };
+      // 數量有修改時，備註加上原廠數量
+      if (patch.qty !== undefined && patch.qty !== it.originalQty) {
+        const base = it.note.replace(/（原廠數量：[\d.]+）/, "").trim();
+        updated.note = base ? `${base}（原廠數量：${it.originalQty}）` : `原廠數量：${it.originalQty}`;
+      }
+      return updated;
+    }));
+  }
+
+  function applyBatchMultiplier() {
+    const m = parseFloat(batchMultiplier);
+    if (!m || m <= 0) return;
+    setParsedItems(prev => prev.map(it => ({ ...it, multiplier: m })));
+  }
+
+  function handleAddSelected() {
+    const selected = parsedItems.filter(it => it.selected);
+    if (selected.length === 0) return;
+    onAddItems(selected);
+    onClose();
+  }
+
+  const panelStyle = {
+    position: "fixed", top: 0, right: 0, bottom: 0, width: 500,
+    background: "#fff", borderLeft: "1px solid #e0e0e0",
+    boxShadow: "-4px 0 16px rgba(0,0,0,0.08)",
+    zIndex: 200, display: "flex", flexDirection: "column",
+    fontFamily: '"微軟正黑體","Microsoft JhengHei","PingFang TC",sans-serif',
+  };
+
+  return (
+    <div style={panelStyle}>
+      {/* 標題列 */}
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid #eee", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>匯入廠商報價</div>
+          <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{groupName} / {categoryName}</div>
+        </div>
+        <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa", padding: "4px 8px" }}>✕</button>
+      </div>
+
+      <div style={{ flex: 1, overflow: "auto", padding: "20px" }}>
+
+        {/* Step 1：說明 */}
+        {step === "guide" && (
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#555" }}>使用步驟</div>
+            {[
+              "點下方按鈕，系統自動複製解析提示詞並開啟 Claude.ai",
+              "在 Claude.ai 上傳廠商報價單（圖片、PDF 或 Excel 截圖）",
+              "貼上提示詞（Ctrl+V）送出",
+              "複製 Claude 回覆的表格，回到這裡貼上",
+            ].map((s, i) => (
+              <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#333", color: "#fff", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
+                <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6, paddingTop: 2 }}>{s}</div>
+              </div>
+            ))}
+            <div style={{ marginTop: 20, padding: "12px", background: "#f9f9f7", borderRadius: 4, fontSize: 11, color: "#aaa", lineHeight: 1.7 }}>
+              支援格式：圖片（JPG/PNG）、PDF、Excel 截圖<br />
+              不論廠商格式如何，Claude 都能自動識別欄位
+            </div>
+            <button style={{ ...S.btn, width: "100%", marginTop: 16 }} onClick={handleCopyAndOpen}>
+              複製提示詞 + 開啟 Claude.ai
+            </button>
+          </div>
+        )}
+
+        {/* Step 2：貼上回覆 */}
+        {step === "paste" && (
+          <div>
+            <div style={{ fontSize: 12, color: "#6aaa8a", marginBottom: 12, padding: "10px 12px", background: "#f0f8f4", borderRadius: 4 }}>
+              ✓ 提示詞已複製，請上傳廠商報價單到 Claude.ai，取得回覆後把表格複製回來
+            </div>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>將 Claude 回覆的表格貼到下方：</div>
+            <textarea
+              style={{ ...S.input, height: 220, resize: "vertical", fontSize: 12, fontFamily: "monospace" }}
+              value={pasteText}
+              onChange={e => setPasteText(e.target.value)}
+              placeholder={"品項名稱 | 單位 | 數量 | 單價 | 總價 | 備註\n矽酸鈣板 9mm | 才 | 120 | 35 | 4200 | 防火\n輕鋼架 | 支 | 30 | 85 | 2550 |\n..."}
+            />
+            {parseError && (
+              <div style={{ fontSize: 12, color: "#c0675a", marginTop: 6, padding: "8px 12px", background: "#fdf0ee", borderRadius: 4 }}>
+                {parseError}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+              <button style={S.btnSecondary} onClick={() => setStep("guide")}>← 返回</button>
+              <button
+                style={{ ...S.btn, flex: 1 }}
+                onClick={handleParse}
+                disabled={!pasteText.trim()}
+              >解析表格</button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3：預覽和編輯 */}
+        {step === "review" && (
+          <div>
+            {/* 批次設定乘數 */}
+            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16, padding: "10px 12px", background: "#f9f9f7", borderRadius: 4 }}>
+              <span style={{ fontSize: 12, color: "#555", whiteSpace: "nowrap" }}>批次設定乘數：</span>
+              <input
+                style={{ ...S.input, width: 80, padding: "6px 10px", fontSize: 13 }}
+                type="number"
+                step="0.1"
+                placeholder="1.3"
+                value={batchMultiplier}
+                onChange={e => setBatchMultiplier(e.target.value)}
+              />
+              <button
+                style={{ ...S.btnSecondary, padding: "6px 14px", fontSize: 12, whiteSpace: "nowrap" }}
+                onClick={applyBatchMultiplier}
+                disabled={!batchMultiplier}
+              >套用全部</button>
+            </div>
+
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>
+              解析出 {parsedItems.length} 個品項，勾選要加入的項目：
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {parsedItems.map(it => (
+                <div key={it.id} style={{
+                  border: `1px solid ${it.selected ? "#ddd" : "#f0f0f0"}`,
+                  borderRadius: 4, padding: "10px 12px",
+                  background: it.selected ? "#fff" : "#fafafa",
+                  opacity: it.selected ? 1 : 0.5,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <input type="checkbox" checked={it.selected} onChange={() => toggleItem(it.id)} />
+                    <input
+                      style={{ ...S.input, fontSize: 13, fontWeight: 500 }}
+                      value={it.itemName}
+                      onChange={e => updateItem(it.id, { itemName: e.target.value })}
+                    />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6 }}>
+                    {[
+                      { label: "單位", key: "unit", type: "text" },
+                      { label: "數量", key: "qty", type: "number" },
+                      { label: "成本單價", key: "cost", type: "number" },
+                      { label: "乘數", key: "multiplier", type: "number" },
+                    ].map(f => (
+                      <div key={f.key}>
+                        <div style={{ fontSize: 10, color: "#aaa", marginBottom: 2 }}>{f.label}</div>
+                        <input
+                          style={{ ...S.input, fontSize: 12, padding: "4px 8px" }}
+                          type={f.type}
+                          value={it[f.key]}
+                          placeholder={f.key === "multiplier" ? "待設定" : ""}
+                          onChange={e => updateItem(it.id, { [f.key]: f.type === "number" ? toNum(e.target.value) : e.target.value })}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {it.note && (
+                    <div style={{ fontSize: 11, color: "#888", marginTop: 6 }}>備註：{it.note}</div>
+                  )}
+                  <div style={{ fontSize: 11, color: "#aaa", marginTop: 4 }}>
+                    報價單價：${fmt(Math.round(toNum(it.cost) * (toNum(it.multiplier) || 1)))}
+                    {it.multiplier ? ` （乘數 ${it.multiplier}）` : "（乘數待設定）"}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button style={S.btnSecondary} onClick={() => setStep("paste")}>← 重新貼上</button>
+              <button
+                style={{ ...S.btn, flex: 1 }}
+                onClick={handleAddSelected}
+                disabled={!parsedItems.some(it => it.selected)}
+              >
+                加入報價單（{parsedItems.filter(it => it.selected).length} 項）
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── 品項編輯器 ─────────────────────────────────────────────
 function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTemplate }) {
   const isIntegrated = quote.type === "integrated";
@@ -1407,7 +1672,9 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
   const categories = settings.engineering_categories || [];
 
   // AI 詢問面板狀態
-  const [aiPanel, setAiPanel] = useState(null); // { groupName, categoryName, groupId, categoryId }
+  const [aiPanel, setAiPanel] = useState(null);
+  // 匯入廠商報價面板狀態
+  const [importPanel, setImportPanel] = useState(null); // { groupName, categoryName, groupId, categoryId }
 
   function addItem(group, category) {
     const newItem = {
@@ -1568,6 +1835,10 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
                       >詢問</button>
                       <button
                         style={{ ...S.btnSecondary, padding: "4px 10px", fontSize: 12 }}
+                        onClick={() => setImportPanel({ groupName: g.name, categoryName: cat.name, groupId: g.id, categoryId: cat.id })}
+                      >匯入廠商報價</button>
+                      <button
+                        style={{ ...S.btnSecondary, padding: "4px 10px", fontSize: 12 }}
                         onClick={() => addItem(g.id, cat.id)}
                       >＋ 新增</button>
                     </div>
@@ -1657,6 +1928,36 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
             onChange([...items, ...toAdd]);
           }}
           onClose={() => setAiPanel(null)}
+        />
+      )}
+
+      {/* 匯入廠商報價面板 */}
+      {importPanel && (
+        <ImportQuotePanel
+          groupName={importPanel.groupName}
+          categoryName={importPanel.categoryName}
+          onAddItems={(newItems) => {
+            const toAdd = newItems.map((it, i) => ({
+              id: genId(),
+              quoteId: quote.id,
+              group: importPanel.groupId,
+              category: importPanel.categoryId,
+              position: "",
+              itemName: it.itemName,
+              unit: it.unit || "式",
+              qty: toNum(it.qty) || 1,
+              cost: toNum(it.cost),
+              multiplier: toNum(it.multiplier) || 0,
+              price: it.multiplier ? Math.round(toNum(it.cost) * toNum(it.multiplier)) : 0,
+              priceOverride: false,
+              total: it.multiplier ? Math.round(toNum(it.cost) * toNum(it.multiplier) * (toNum(it.qty) || 1)) : 0,
+              note: it.note || "",
+              sortOrder: items.length + i,
+              updatedAt: now(),
+            }));
+            onChange([...items, ...toAdd]);
+          }}
+          onClose={() => setImportPanel(null)}
         />
       )}
     </div>
