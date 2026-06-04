@@ -196,6 +196,7 @@ function settingsToRows(settings) {
 
 // ─── 計算邏輯 ───────────────────────────────────────────────
 function calcItem(item) {
+  if (item.unit === "__section__") return { ...item, price: 0, total: 0, margin: null };
   const cost = toNum(item.cost);
   const multiplier = toNum(item.multiplier) || 1;
   const qty = toNum(item.qty) || 1;
@@ -206,7 +207,9 @@ function calcItem(item) {
 }
 
 function calcQuoteSummary(items, quote) {
-  const subtotal = items.reduce((s, it) => s + toNum(it.total), 0);
+  const subtotal = items
+    .filter(it => it.unit !== "__section__")
+    .reduce((s, it) => s + toNum(it.total), 0);
 
   let managementFeeRaw = 0;
   if (quote.managementFeeMode === "percent") {
@@ -1758,6 +1761,28 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
     onChange([...items, newItem]);
   }
 
+  function addSection(group, category) {
+    const newSection = {
+      id: genId(),
+      quoteId: quote.id,
+      group: group || "",
+      category: category || "",
+      position: "",
+      itemName: "新標題",
+      unit: "__section__",
+      qty: 0,
+      cost: 0,
+      multiplier: 0,
+      price: 0,
+      priceOverride: false,
+      total: 0,
+      note: "",
+      sortOrder: items.length,
+      updatedAt: now(),
+    };
+    onChange([...items, newSection]);
+  }
+
   function updateItem(id, patch) {
     onChange(items.map(it => it.id === id ? { ...it, ...patch, updatedAt: now() } : it));
   }
@@ -1814,6 +1839,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
               style={S.btnSecondary}
               onClick={() => setImportPanel({ groupName: "獨立品項", categoryName: "廠商報價", groupId: "", categoryId: "" })}
             >匯入廠商報價</button>
+            <button style={S.btnSecondary} onClick={() => addSection("", "")}>＋ 分隔標題</button>
             <button style={S.btn} onClick={() => addItem("", "")}>＋ 新增品項</button>
           </div>
         </div>
@@ -1951,6 +1977,10 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
                         style={{ ...S.btnSecondary, padding: "4px 10px", fontSize: 12 }}
                         onClick={() => setImportPanel({ groupName: g.name, categoryName: cat.name, groupId: g.id, categoryId: cat.id })}
                       >匯入廠商報價</button>
+                      <button
+                        style={{ ...S.btnSecondary, padding: "4px 10px", fontSize: 12 }}
+                        onClick={() => addSection(g.id, cat.id)}
+                      >＋ 分隔標題</button>
                       <button
                         style={{ ...S.btnSecondary, padding: "4px 10px", fontSize: 12 }}
                         onClick={() => addItem(g.id, cat.id)}
@@ -2128,27 +2158,107 @@ function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove,
       </div>
 
       {items.map((it, idx) => (
-        <ItemRow
-          key={it.id}
-          item={it}
-          index={idx + 1}
-          showPosition={showPosition}
-          colWidths={colWidths}
-          isDragOver={dragOverId === it.id}
-          onUpdate={(patch) => onUpdate(it.id, patch)}
-          onRemove={() => onRemove(it.id)}
-          onMoveUp={() => onMove(it.id, "up")}
-          onMoveDown={() => onMove(it.id, "down")}
-          onDragOver={(e) => handleDragOver(e, it.id)}
-          onDrop={(e) => handleDrop(e, it.id)}
-          onDragLeave={() => setDragOverId(null)}
-        />
+        it.unit === "__section__" ? (
+          <SectionRow
+            key={it.id}
+            item={it}
+            isDragOver={dragOverId === it.id}
+            onUpdate={(patch) => onUpdate(it.id, patch)}
+            onRemove={() => onRemove(it.id)}
+            onDragOver={(e) => handleDragOver(e, it.id)}
+            onDrop={(e) => handleDrop(e, it.id)}
+            onDragLeave={() => setDragOverId(null)}
+          />
+        ) : (
+          <ItemRow
+            key={it.id}
+            item={it}
+            index={idx + 1}
+            showPosition={showPosition}
+            colWidths={colWidths}
+            isDragOver={dragOverId === it.id}
+            onUpdate={(patch) => onUpdate(it.id, patch)}
+            onRemove={() => onRemove(it.id)}
+            onMoveUp={() => onMove(it.id, "up")}
+            onMoveDown={() => onMove(it.id, "down")}
+            onDragOver={(e) => handleDragOver(e, it.id)}
+            onDrop={(e) => handleDrop(e, it.id)}
+            onDragLeave={() => setDragOverId(null)}
+          />
+        )
       ))}
 
       {items.length === 0 && (
         <div style={{ padding: "16px 8px", color: "#ccc", fontSize: 12, textAlign: "center" }}>
           尚無品項
         </div>
+      )}
+    </div>
+  );
+}
+
+// ─── 分隔標題列 ─────────────────────────────────────────────
+function SectionRow({ item, isDragOver, onUpdate, onRemove, onDragOver, onDrop, onDragLeave }) {
+  const [editing, setEditing] = useState(false);
+  const [hover, setHover] = useState(false);
+
+  return (
+    <div
+      draggable
+      onDragStart={e => e.dataTransfer.setData("itemId", item.id)}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragLeave={onDragLeave}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "6px 8px",
+        background: isDragOver ? "#e8e8e6" : "#f0f0ee",
+        borderBottom: isDragOver ? "2px solid #888" : "1px solid #e8e8e6",
+        borderRadius: 3,
+        margin: "8px 0 4px",
+        cursor: "grab",
+      }}
+    >
+      {/* 拖拉把手 */}
+      <div style={{ color: "#bbb", fontSize: 13, userSelect: "none" }}>⠿</div>
+
+      {/* 標題文字 */}
+      {editing ? (
+        <input
+          autoFocus
+          style={{
+            flex: 1, border: "none", background: "transparent",
+            fontSize: 13, fontWeight: 600, color: "#444",
+            outline: "1px solid #ccc", borderRadius: 3, padding: "2px 6px",
+            fontFamily: '"微軟正黑體","Microsoft JhengHei","PingFang TC",sans-serif',
+          }}
+          value={item.itemName}
+          onChange={e => onUpdate({ itemName: e.target.value })}
+          onBlur={() => setEditing(false)}
+          onKeyDown={e => e.key === "Enter" && setEditing(false)}
+        />
+      ) : (
+        <div
+          style={{ flex: 1, fontSize: 13, fontWeight: 600, color: "#444", cursor: "text", letterSpacing: 0.5 }}
+          onClick={() => setEditing(true)}
+          title="點擊修改標題"
+        >
+          {item.itemName || "（點擊輸入標題）"}
+        </div>
+      )}
+
+      {/* 刪除按鈕 */}
+      {hover && (
+        <button
+          onClick={onRemove}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#bbb", fontSize: 14, padding: "2px 6px" }}
+          onMouseEnter={e => e.target.style.color = "#c0675a"}
+          onMouseLeave={e => e.target.style.color = "#bbb"}
+        >✕</button>
       )}
     </div>
   );
@@ -2659,17 +2769,37 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {cd.catItems.map((it, i) => (
-                      <tr key={it.id}>
-                        <td style={{ ...cellCenter, color: "#aaa" }}>{i + 1}</td>
-                        <td style={cellLeft}>{it.itemName}</td>
-                        <td style={cellCenter}>{it.unit}</td>
-                        <td style={cellCenter}>{it.qty}</td>
-                        <td style={cellRight}>{fmt(it.price)}</td>
-                        <td style={cellRight}>{fmt(it.total)}</td>
-                        <td style={cellRight}>{it.note}</td>
-                      </tr>
-                    ))}
+                    {(() => {
+                      let itemCount = 0;
+                      return cd.catItems.map((it) => {
+                        if (it.unit === "__section__") {
+                          return (
+                            <tr key={it.id}>
+                              <td colSpan={7} style={{
+                                padding: "7px 10px",
+                                background: "#f0f0ee",
+                                fontWeight: 600,
+                                fontSize: 12,
+                                color: "#444",
+                                letterSpacing: 0.5,
+                              }}>{it.itemName}</td>
+                            </tr>
+                          );
+                        }
+                        itemCount++;
+                        return (
+                          <tr key={it.id}>
+                            <td style={{ ...cellCenter, color: "#aaa" }}>{itemCount}</td>
+                            <td style={cellLeft}>{it.itemName}</td>
+                            <td style={cellCenter}>{it.unit}</td>
+                            <td style={cellCenter}>{it.qty}</td>
+                            <td style={cellRight}>{fmt(it.price)}</td>
+                            <td style={cellRight}>{fmt(it.total)}</td>
+                            <td style={cellRight}>{it.note}</td>
+                          </tr>
+                        );
+                      });
+                    })()}
                   </tbody>
                   <tfoot>
                     <tr style={{ fontWeight: 600, background: "#fafafa" }}>
@@ -2727,20 +2857,40 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
             </tr>
           </thead>
           <tbody>
-            {items.map((it, i) => (
-              <tr key={it.id}>
-                <td style={{ ...cellCenter, color: "#aaa" }}>{i + 1}</td>
-                <td style={cellCenter}>{it.position || ""}</td>
-                <td style={cellLeft}>{it.itemName}</td>
-                <td style={cellCenter}>{it.unit}</td>
-                <td style={cellCenter}>{it.qty}</td>
-                {showCost && <td style={cellRight}>{it.cost ? fmt(it.cost) : ""}</td>}
-                {showCost && <td style={cellCenter}>{it.multiplier || ""}</td>}
-                <td style={cellRight}>{fmt(it.price)}</td>
-                <td style={cellRight}>{fmt(it.total)}</td>
-                <td style={cellRight}>{it.note}</td>
-              </tr>
-            ))}
+            {(() => {
+              let itemCount = 0;
+              return items.map((it) => {
+                if (it.unit === "__section__") {
+                  return (
+                    <tr key={it.id}>
+                      <td colSpan={showCost ? 10 : 8} style={{
+                        padding: "8px 10px",
+                        background: "#f0f0ee",
+                        fontWeight: 600,
+                        fontSize: 13,
+                        color: "#444",
+                        letterSpacing: 0.5,
+                      }}>{it.itemName}</td>
+                    </tr>
+                  );
+                }
+                itemCount++;
+                return (
+                  <tr key={it.id}>
+                    <td style={{ ...cellCenter, color: "#aaa" }}>{itemCount}</td>
+                    <td style={cellCenter}>{it.position || ""}</td>
+                    <td style={cellLeft}>{it.itemName}</td>
+                    <td style={cellCenter}>{it.unit}</td>
+                    <td style={cellCenter}>{it.qty}</td>
+                    {showCost && <td style={cellRight}>{it.cost ? fmt(it.cost) : ""}</td>}
+                    {showCost && <td style={cellCenter}>{it.multiplier || ""}</td>}
+                    <td style={cellRight}>{fmt(it.price)}</td>
+                    <td style={cellRight}>{fmt(it.total)}</td>
+                    <td style={cellRight}>{it.note}</td>
+                  </tr>
+                );
+              });
+            })()}
           </tbody>
         </table>
 
