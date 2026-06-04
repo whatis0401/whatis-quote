@@ -3430,6 +3430,8 @@ function BankAccountsEditor({ accounts, onChange }) {
 function EngineeringEditor({ groups, categories, onChangeGroups, onChangeCategories }) {
   const [editingCatId, setEditingCatId] = useState(null);
   const [editingGroupId, setEditingGroupId] = useState(null);
+  const [dragOverGroupId, setDragOverGroupId] = useState(null);
+  const [dragOverCatId, setDragOverCatId] = useState(null);
 
   // ── 群組操作 ──
   function addGroup() {
@@ -3444,17 +3446,20 @@ function EngineeringEditor({ groups, categories, onChangeGroups, onChangeCategor
     onChangeGroups(groups.filter(g => g.id !== id));
     onChangeCategories(categories.filter(c => c.groupId !== id));
   }
+  function reorderGroup(sourceId, targetId) {
+    const srcIdx = groups.findIndex(g => g.id === sourceId);
+    const tgtIdx = groups.findIndex(g => g.id === targetId);
+    if (srcIdx < 0 || tgtIdx < 0 || srcIdx === tgtIdx) return;
+    const next = [...groups];
+    const [moved] = next.splice(srcIdx, 1);
+    next.splice(tgtIdx, 0, moved);
+    onChangeGroups(next.map((g, i) => ({ ...g, sortOrder: i + 1 })));
+  }
 
   // ── 大項操作 ──
   function addCategory(groupId) {
     const gCats = categories.filter(c => c.groupId === groupId);
-    const newC = {
-      id: genId(),
-      groupId,
-      name: "新工程大項",
-      sortOrder: gCats.length + 1,
-      active: true,
-    };
+    const newC = { id: genId(), groupId, name: "新工程大項", sortOrder: gCats.length + 1, active: true };
     onChangeCategories([...categories, newC]);
     setEditingCatId(newC.id);
   }
@@ -3468,15 +3473,46 @@ function EngineeringEditor({ groups, categories, onChangeGroups, onChangeCategor
     if (!confirm("確定刪除此工程大項？")) return;
     onChangeCategories(categories.filter(c => c.id !== id));
   }
+  function reorderCategory(sourceId, targetId, groupId) {
+    const gCats = categories.filter(c => c.groupId === groupId);
+    const otherCats = categories.filter(c => c.groupId !== groupId);
+    const srcIdx = gCats.findIndex(c => c.id === sourceId);
+    const tgtIdx = gCats.findIndex(c => c.id === targetId);
+    if (srcIdx < 0 || tgtIdx < 0 || srcIdx === tgtIdx) return;
+    const next = [...gCats];
+    const [moved] = next.splice(srcIdx, 1);
+    next.splice(tgtIdx, 0, moved);
+    onChangeCategories([...otherCats, ...next.map((c, i) => ({ ...c, sortOrder: i + 1 }))]);
+  }
 
   return (
     <div style={{ maxWidth: 640 }}>
       {groups.map(g => {
         const gCats = categories.filter(c => c.groupId === g.id);
         return (
-          <div key={g.id} style={{ ...S.card, marginBottom: 16 }}>
+          <div
+            key={g.id}
+            draggable
+            onDragStart={e => { e.dataTransfer.setData("groupId", g.id); e.dataTransfer.setData("dragType", "group"); }}
+            onDragOver={e => { e.preventDefault(); setDragOverGroupId(g.id); }}
+            onDragLeave={() => setDragOverGroupId(null)}
+            onDrop={e => {
+              e.preventDefault();
+              setDragOverGroupId(null);
+              const dragType = e.dataTransfer.getData("dragType");
+              if (dragType === "group") {
+                reorderGroup(e.dataTransfer.getData("groupId"), g.id);
+              }
+            }}
+            style={{
+              ...S.card, marginBottom: 16,
+              borderColor: dragOverGroupId === g.id ? "#888" : "#e8e8e8",
+              transition: "border-color 0.15s",
+            }}
+          >
             {/* 群組標題列 */}
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              <div style={{ color: "#ccc", cursor: "grab", fontSize: 16, userSelect: "none", padding: "0 4px" }} title="拖拉調整群組順序">⠿</div>
               {editingGroupId === g.id ? (
                 <input
                   autoFocus
@@ -3502,7 +3538,27 @@ function EngineeringEditor({ groups, categories, onChangeGroups, onChangeCategor
             {/* 大項列表 */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
               {gCats.map(c => (
-                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                <div
+                  key={c.id}
+                  draggable
+                  onDragStart={e => { e.stopPropagation(); e.dataTransfer.setData("catId", c.id); e.dataTransfer.setData("dragType", "cat"); e.dataTransfer.setData("groupId", g.id); }}
+                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverCatId(c.id); }}
+                  onDragLeave={e => { e.stopPropagation(); setDragOverCatId(null); }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setDragOverCatId(null);
+                    const dragType = e.dataTransfer.getData("dragType");
+                    if (dragType === "cat") {
+                      reorderCategory(e.dataTransfer.getData("catId"), c.id, g.id);
+                    }
+                  }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 0,
+                    outline: dragOverCatId === c.id ? "2px solid #888" : "none",
+                    borderRadius: 4,
+                  }}
+                >
                   {editingCatId === c.id ? (
                     <input
                       autoFocus
@@ -3520,13 +3576,13 @@ function EngineeringEditor({ groups, categories, onChangeGroups, onChangeCategor
                     <button
                       onClick={() => toggleCategory(c.id)}
                       onDoubleClick={() => setEditingCatId(c.id)}
-                      title="點擊啟用/停用，雙擊修改名稱"
+                      title="點擊啟用/停用，雙擊修改名稱，拖拉調整順序"
                       style={{
                         padding: "5px 12px",
                         borderRadius: "4px 0 0 4px",
                         border: "1px solid",
                         fontSize: 12,
-                        cursor: "pointer",
+                        cursor: "grab",
                         fontFamily: "inherit",
                         background: c.active !== false ? "#333" : "transparent",
                         color: c.active !== false ? "#fff" : "#aaa",
@@ -3560,13 +3616,14 @@ function EngineeringEditor({ groups, categories, onChangeGroups, onChangeCategor
             </div>
 
             <div style={{ fontSize: 11, color: "#bbb" }}>
-              點擊切換啟用/停用 · 雙擊修改名稱 · ✕ 刪除
+              點擊切換啟用/停用 · 雙擊修改名稱 · 拖拉調整順序 · ✕ 刪除
             </div>
           </div>
         );
       })}
 
       <button style={S.btnSecondary} onClick={addGroup}>＋ 新增工程群組</button>
+      <div style={{ fontSize: 11, color: "#bbb", marginTop: 8 }}>群組卡片也可以拖拉調整順序</div>
     </div>
   );
 }
