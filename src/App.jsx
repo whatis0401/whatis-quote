@@ -3163,41 +3163,145 @@ function BankAccountsEditor({ accounts, onChange }) {
 }
 
 function EngineeringEditor({ groups, categories, onChangeGroups, onChangeCategories }) {
-  function toggleCat(id) {
-    onChangeCategories(categories.map(c => c.id === id ? { ...c, active: !c.active } : c));
+  const [editingCatId, setEditingCatId] = useState(null);
+  const [editingGroupId, setEditingGroupId] = useState(null);
+
+  // ── 群組操作 ──
+  function addGroup() {
+    const newG = { id: genId(), name: "新群組", sortOrder: groups.length + 1 };
+    onChangeGroups([...groups, newG]);
+  }
+  function updateGroup(id, name) {
+    onChangeGroups(groups.map(g => g.id === id ? { ...g, name } : g));
+  }
+  function removeGroup(id) {
+    if (!confirm("確定刪除此群組？底下的工程大項也會一併刪除。")) return;
+    onChangeGroups(groups.filter(g => g.id !== id));
+    onChangeCategories(categories.filter(c => c.groupId !== id));
+  }
+
+  // ── 大項操作 ──
+  function addCategory(groupId) {
+    const gCats = categories.filter(c => c.groupId === groupId);
+    const newC = {
+      id: genId(),
+      groupId,
+      name: "新工程大項",
+      sortOrder: gCats.length + 1,
+      active: true,
+    };
+    onChangeCategories([...categories, newC]);
+    setEditingCatId(newC.id);
+  }
+  function updateCategory(id, name) {
+    onChangeCategories(categories.map(c => c.id === id ? { ...c, name } : c));
+  }
+  function toggleCategory(id) {
+    onChangeCategories(categories.map(c => c.id === id ? { ...c, active: c.active !== false ? false : true } : c));
+  }
+  function removeCategory(id) {
+    if (!confirm("確定刪除此工程大項？")) return;
+    onChangeCategories(categories.filter(c => c.id !== id));
   }
 
   return (
-    <div>
+    <div style={{ maxWidth: 640 }}>
       {groups.map(g => {
         const gCats = categories.filter(c => c.groupId === g.id);
         return (
-          <div key={g.id} style={{ ...S.card, marginBottom: 16, maxWidth: 560 }}>
-            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 14 }}>{g.name}</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div key={g.id} style={{ ...S.card, marginBottom: 16 }}>
+            {/* 群組標題列 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+              {editingGroupId === g.id ? (
+                <input
+                  autoFocus
+                  style={{ ...S.input, fontSize: 14, fontWeight: 600, flex: 1 }}
+                  value={g.name}
+                  onChange={e => updateGroup(g.id, e.target.value)}
+                  onBlur={() => setEditingGroupId(null)}
+                  onKeyDown={e => e.key === "Enter" && setEditingGroupId(null)}
+                />
+              ) : (
+                <div
+                  style={{ fontWeight: 600, fontSize: 14, flex: 1, cursor: "pointer" }}
+                  onClick={() => setEditingGroupId(g.id)}
+                  title="點擊修改群組名稱"
+                >{g.name}</div>
+              )}
+              <button
+                style={{ ...S.btnDanger, padding: "3px 10px", fontSize: 11 }}
+                onClick={() => removeGroup(g.id)}
+              >刪除群組</button>
+            </div>
+
+            {/* 大項列表 */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
               {gCats.map(c => (
-                <button
-                  key={c.id}
-                  onClick={() => toggleCat(c.id)}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: 4,
-                    border: "1px solid",
-                    fontSize: 12,
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    background: c.active !== false ? "#333" : "transparent",
-                    color: c.active !== false ? "#fff" : "#aaa",
-                    borderColor: c.active !== false ? "#333" : "#e0e0e0",
-                    transition: "all 0.15s",
-                  }}
-                >{c.name}</button>
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 0 }}>
+                  {editingCatId === c.id ? (
+                    <input
+                      autoFocus
+                      style={{
+                        border: "1px solid #888", borderRadius: "4px 0 0 4px",
+                        padding: "5px 10px", fontSize: 12, fontFamily: "inherit",
+                        outline: "none", width: 120,
+                      }}
+                      value={c.name}
+                      onChange={e => updateCategory(c.id, e.target.value)}
+                      onBlur={() => setEditingCatId(null)}
+                      onKeyDown={e => e.key === "Enter" && setEditingCatId(null)}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => toggleCategory(c.id)}
+                      onDoubleClick={() => setEditingCatId(c.id)}
+                      title="點擊啟用/停用，雙擊修改名稱"
+                      style={{
+                        padding: "5px 12px",
+                        borderRadius: "4px 0 0 4px",
+                        border: "1px solid",
+                        fontSize: 12,
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        background: c.active !== false ? "#333" : "transparent",
+                        color: c.active !== false ? "#fff" : "#aaa",
+                        borderColor: c.active !== false ? "#333" : "#e0e0e0",
+                        transition: "all 0.15s",
+                      }}
+                    >{c.name}</button>
+                  )}
+                  <button
+                    onClick={() => removeCategory(c.id)}
+                    title="刪除"
+                    style={{
+                      padding: "5px 7px",
+                      borderRadius: "0 4px 4px 0",
+                      border: "1px solid",
+                      borderLeft: "none",
+                      fontSize: 11,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      background: c.active !== false ? "#444" : "#f5f5f5",
+                      color: c.active !== false ? "#ddd" : "#bbb",
+                      borderColor: c.active !== false ? "#333" : "#e0e0e0",
+                    }}
+                  >✕</button>
+                </div>
               ))}
+              <button
+                style={{ ...S.btnSecondary, padding: "5px 12px", fontSize: 12 }}
+                onClick={() => addCategory(g.id)}
+              >＋ 新增大項</button>
+            </div>
+
+            <div style={{ fontSize: 11, color: "#bbb" }}>
+              點擊切換啟用/停用 · 雙擊修改名稱 · ✕ 刪除
             </div>
           </div>
         );
       })}
-      <div style={{ fontSize: 12, color: "#aaa", marginTop: 8 }}>點擊切換工程大項啟用 / 停用狀態</div>
+
+      <button style={S.btnSecondary} onClick={addGroup}>＋ 新增工程群組</button>
     </div>
   );
 }
