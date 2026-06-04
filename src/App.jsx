@@ -390,29 +390,88 @@ export default function App() {
 
   // 讀取全部資料
   useEffect(() => {
+    const CACHE_KEY = "whatis_quote_cache";
+    const CACHE_TTL = 5 * 60 * 1000; // 5 分鐘
+
+    function parseSettings(s) {
+      ["bank_accounts","engineering_groups","engineering_categories","term_templates"].forEach(k => {
+        if (s[k]) try { s[k] = JSON.parse(s[k]); } catch { s[k] = []; }
+      });
+      if (s.print_layout) try { s.print_layout = JSON.parse(s.print_layout); } catch { s.print_layout = null; }
+      return s;
+    }
+
+    async function fetchFromGAS() {
+      const [qRows, iRows, tRows, sRows] = await Promise.all([
+        sheetGet("Quotes"),
+        sheetGet("QuoteItems"),
+        sheetGet("Templates"),
+        sheetGet("Settings"),
+      ]);
+      const s = parseSettings(rowsToSettings(sRows));
+      return {
+        quotes: rowsToQuotes(qRows),
+        allItems: rowsToItems(iRows),
+        templates: rowsToTemplates(tRows),
+        settings: s,
+        cachedAt: Date.now(),
+      };
+    }
+
     async function loadAll() {
+      // 先嘗試讀取快取
       try {
-        const [qRows, iRows, tRows, sRows] = await Promise.all([
-          sheetGet("Quotes"),
-          sheetGet("QuoteItems"),
-          sheetGet("Templates"),
-          sheetGet("Settings"),
-        ]);
-        setQuotes(rowsToQuotes(qRows));
-        setAllItems(rowsToItems(iRows));
-        setTemplates(rowsToTemplates(tRows));
-        const s = rowsToSettings(sRows);
-        ["bank_accounts","engineering_groups","engineering_categories","term_templates"].forEach(k => {
-          if (s[k]) try { s[k] = JSON.parse(s[k]); } catch { s[k] = []; }
-        });
-        if (s.print_layout) try { s.print_layout = JSON.parse(s.print_layout); } catch { s.print_layout = null; }
-        setSettings(s);
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const data = JSON.parse(cached);
+          const age = Date.now() - (data.cachedAt || 0);
+          // 快取未過期：立即顯示快取，背景靜默更新
+          setQuotes(data.quotes || []);
+          setAllItems(data.allItems || []);
+          setTemplates(data.templates || []);
+          setSettings(data.settings || {});
+          setLoading(false);
+
+          if (age < CACHE_TTL) {
+            // 快取還新鮮，背景靜默更新
+            fetchFromGAS().then(fresh => {
+              setQuotes(fresh.quotes);
+              setAllItems(fresh.allItems);
+              setTemplates(fresh.templates);
+              setSettings(fresh.settings);
+              localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+            }).catch(() => {});
+            return;
+          }
+          // 快取過期，背景更新但不阻塞
+          fetchFromGAS().then(fresh => {
+            setQuotes(fresh.quotes);
+            setAllItems(fresh.allItems);
+            setTemplates(fresh.templates);
+            setSettings(fresh.settings);
+            localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+          }).catch(e => setNotification({ msg: "背景更新失敗：" + e.message, type: "error" }));
+          return;
+        }
+      } catch (e) {
+        // 快取讀取失敗，繼續從 GAS 讀取
+      }
+
+      // 無快取，直接從 GAS 讀取
+      try {
+        const fresh = await fetchFromGAS();
+        setQuotes(fresh.quotes);
+        setAllItems(fresh.allItems);
+        setTemplates(fresh.templates);
+        setSettings(fresh.settings);
+        localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
       } catch (e) {
         setNotification({ msg: "載入失敗：" + e.message, type: "error" });
       } finally {
         setLoading(false);
       }
     }
+
     loadAll();
   }, []);
 
@@ -440,6 +499,7 @@ export default function App() {
         if (newSettings !== undefined) ops.push(sheetPut("Settings", settingsToRows(serialSettings)));
 
         await Promise.all(ops);
+        localStorage.removeItem("whatis_quote_cache");
         showNotif("已儲存", "success");
       } catch (e) {
         showNotif("儲存失敗：" + e.message, "error");
@@ -1746,6 +1806,14 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
                 ))}
               </select>
             )}
+            <button
+              style={S.btnSecondary}
+              onClick={() => setAiPanel({ groupName: "獨立品項", categoryName: "報價參考", groupId: "", categoryId: "" })}
+            >詢問</button>
+            <button
+              style={S.btnSecondary}
+              onClick={() => setImportPanel({ groupName: "獨立品項", categoryName: "廠商報價", groupId: "", categoryId: "" })}
+            >匯入廠商報價</button>
             <button style={S.btn} onClick={() => addItem("", "")}>＋ 新增品項</button>
           </div>
         </div>
@@ -1756,8 +1824,54 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
           onUpdate={updateItem}
           onRemove={removeItem}
           onMove={moveItem}
-                      onReorder={reorderItem}
+          onReorder={reorderItem}
         />
+
+        {/* AI 詢問面板 */}
+        {aiPanel && (
+          <AiQueryPanel
+            groupName={aiPanel.groupName}
+            categoryName={aiPanel.categoryName}
+            onAddItems={(newItems) => {
+              const toAdd = newItems.map((it, i) => ({
+                id: genId(), quoteId: quote.id,
+                group: "", category: "", position: "",
+                itemName: it.itemName, unit: it.unit || "式",
+                qty: toNum(it.qty) || 1, cost: toNum(it.cost),
+                multiplier: toNum(it.multiplier) || 1.4,
+                price: Math.round(toNum(it.cost) * (toNum(it.multiplier) || 1.4)),
+                priceOverride: false,
+                total: Math.round(toNum(it.cost) * (toNum(it.multiplier) || 1.4) * (toNum(it.qty) || 1)),
+                note: it.note || "", sortOrder: items.length + i, updatedAt: now(),
+              }));
+              onChange([...items, ...toAdd]);
+            }}
+            onClose={() => setAiPanel(null)}
+          />
+        )}
+
+        {/* 匯入廠商報價面板 */}
+        {importPanel && (
+          <ImportQuotePanel
+            groupName={importPanel.groupName}
+            categoryName={importPanel.categoryName}
+            onAddItems={(newItems) => {
+              const toAdd = newItems.map((it, i) => ({
+                id: genId(), quoteId: quote.id,
+                group: "", category: "", position: "",
+                itemName: it.itemName, unit: it.unit || "式",
+                qty: toNum(it.qty) || 1, cost: toNum(it.cost),
+                multiplier: toNum(it.multiplier) || 0,
+                price: it.multiplier ? Math.round(toNum(it.cost) * toNum(it.multiplier)) : 0,
+                priceOverride: false,
+                total: it.multiplier ? Math.round(toNum(it.cost) * toNum(it.multiplier) * (toNum(it.qty) || 1)) : 0,
+                note: it.note || "", sortOrder: items.length + i, updatedAt: now(),
+              }));
+              onChange([...items, ...toAdd]);
+            }}
+            onClose={() => setImportPanel(null)}
+          />
+        )}
       </div>
     );
   }
