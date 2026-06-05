@@ -1949,7 +1949,10 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
   }
 
   // 整合式：按群組/大項分層
-  const activeCategories = categories.filter(c => c.active !== false);
+  const activeCategories = categories
+    .filter(c => c.active !== false)
+    .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  const sortedGroups = [...groups].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
   const itemsByCategory = {};
   items.forEach(it => {
     const key = `${it.group}||${it.category}`;
@@ -1979,7 +1982,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
         )}
       </div>
 
-      {groups.map(g => {
+      {sortedGroups.map(g => {
         const gCats = activeCategories.filter(c => c.groupId === g.id);
         const gItems = items.filter(it => it.group === g.id);
         const gTotal = gItems.map(calcItem).reduce((s, it) => s + it.total, 0);
@@ -2100,7 +2103,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
 
       {/* 在此群組外新增 */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {groups.map(g => (
+        {sortedGroups.map(g => (
           <button key={g.id} style={S.btnSecondary} onClick={() => addItem(g.id, "")}>
             ＋ {g.name}
           </button>
@@ -2648,12 +2651,20 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
   // 整合式：計算各大項小計
   function buildIntegratedSummary() {
     const result = [];
-    groups.forEach(g => {
-      const gItems = items.filter(it => it.group === g.id);
+    // 依照 sortOrder 排序群組
+    const sortedGroups = [...groups].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    sortedGroups.forEach(g => {
+      const gItems = items.filter(it => it.group === g.id && it.unit !== "__section__");
       if (gItems.length === 0) return;
       const cats = [];
-      const catIds = [...new Set(gItems.map(it => it.category))];
-      catIds.forEach(catId => {
+      // 取出此群組用到的大項 id，依照 categories 的 sortOrder 排序
+      const usedCatIds = [...new Set(gItems.map(it => it.category))];
+      const sortedCatIds = usedCatIds.sort((a, b) => {
+        const catA = categories.find(c => c.id === a);
+        const catB = categories.find(c => c.id === b);
+        return (catA?.sortOrder || 999) - (catB?.sortOrder || 999);
+      });
+      sortedCatIds.forEach(catId => {
         const cat = categories.find(c => c.id === catId);
         const catItems = gItems.filter(it => it.category === catId);
         const catTotal = catItems.reduce((s, it) => s + it.total, 0);
