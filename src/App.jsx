@@ -148,6 +148,8 @@ function rowsToItems(rows) {
     total: toNum(r[idx("total")]),
     note: r[idx("note")] || "",
     sortOrder: toNum(r[idx("sortOrder")]),
+    tag: r[idx("tag")] || null,
+    tagMemo: r[idx("tagMemo")] || null,
     updatedAt: r[idx("updatedAt")] || "",
   }));
 }
@@ -155,13 +157,15 @@ function rowsToItems(rows) {
 function itemsToRows(items) {
   const h = [
     "id","quoteId","group","category","position","itemName","unit","qty",
-    "cost","multiplier","price","priceOverride","total","note","sortOrder","updatedAt"
+    "cost","multiplier","price","priceOverride","total","note","sortOrder","tag","tagMemo","updatedAt"
   ];
   return [h, ...items.map(it => [
     it.id, it.quoteId, it.group, it.category, it.position,
     it.itemName, it.unit, it.qty, it.cost, it.multiplier,
     it.price, it.priceOverride ? "TRUE" : "FALSE",
-    it.total, it.note, it.sortOrder, it.updatedAt,
+    it.total, it.note, it.sortOrder,
+    it.tag || "", it.tagMemo || "",
+    it.updatedAt,
   ])];
 }
 
@@ -2334,6 +2338,25 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
   const [hover, setHover] = useState(false);
   const [priceRef, setPriceRef] = useState(null);
   const [searching, setSearching] = useState(false);
+  const [showTagMenu, setShowTagMenu] = useState(false);
+  const [memoText, setMemoText] = useState(item.tagMemo || "");
+
+  const currentTag = ITEM_TAGS.find(t => t.id === item.tag);
+
+  function handleTagSelect(tagId) {
+    if (tagId === item.tag) {
+      // 點相同標籤 → 移除
+      onUpdate({ tag: null, tagMemo: null });
+    } else {
+      onUpdate({ tag: tagId, tagMemo: tagId === "memo" ? memoText : null });
+    }
+    if (tagId !== "memo") setShowTagMenu(false);
+  }
+
+  function handleMemoSave() {
+    onUpdate({ tag: "memo", tagMemo: memoText });
+    setShowTagMenu(false);
+  }
 
   async function handleNameBlur(name) {
     if (!name || name.length < 3) return;
@@ -2367,6 +2390,14 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
   const numStyle = { ...inputStyle, textAlign: "right" };
 
   return (
+    <div style={{ position: "relative" }}>
+      {/* 標籤標示（左側色條） */}
+      {currentTag && (
+        <div style={{
+          position: "absolute", left: 0, top: 0, bottom: 0, width: 3,
+          background: currentTag.color, borderRadius: "2px 0 0 2px",
+        }} />
+      )}
     <div
       draggable
       onDragStart={e => e.dataTransfer.setData("itemId", item.id)}
@@ -2379,9 +2410,10 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
         padding: "4px 8px",
         alignItems: "center",
         borderBottom: isDragOver ? "2px solid #888" : "1px solid #f5f5f5",
-        background: isDragOver ? "#f5f5f3" : hover ? "#fafafa" : "transparent",
+        background: isDragOver ? "#f5f5f3" : currentTag ? currentTag.bg : hover ? "#fafafa" : "transparent",
         gap: 6,
         transition: "background 0.1s",
+        paddingLeft: currentTag ? 10 : 8,
       }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -2513,7 +2545,79 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
         onBlur={e => e.target.style.borderColor = "transparent"}
         placeholder="備註"
       />
-      <div style={{ display: "flex", gap: 2, justifyContent: "flex-end" }}>
+      <div style={{ display: "flex", gap: 2, justifyContent: "flex-end", alignItems: "center", position: "relative" }}>
+        {/* 標籤按鈕 */}
+        <button
+          onClick={() => setShowTagMenu(!showTagMenu)}
+          title="設定標籤"
+          style={{
+            background: currentTag ? currentTag.color : "none",
+            border: currentTag ? "none" : "none",
+            cursor: "pointer",
+            color: currentTag ? "#fff" : "#ddd",
+            fontSize: currentTag ? 10 : 13,
+            padding: currentTag ? "2px 6px" : "2px 4px",
+            borderRadius: 3,
+            fontFamily: "inherit",
+            fontWeight: currentTag ? 600 : 400,
+          }}
+          onMouseEnter={e => { if (!currentTag) e.target.style.color = "#888"; }}
+          onMouseLeave={e => { if (!currentTag) e.target.style.color = "#ddd"; }}
+        >
+          {currentTag ? currentTag.label : "🏷"}
+        </button>
+
+        {/* 標籤選單 */}
+        {showTagMenu && (
+          <div style={{
+            position: "absolute", right: 40, top: 0, zIndex: 100,
+            background: "#fff", border: "1px solid #e0e0e0", borderRadius: 6,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 10, minWidth: 160,
+          }}
+            onMouseLeave={() => setShowTagMenu(false)}
+          >
+            <div style={{ fontSize: 11, color: "#aaa", marginBottom: 8 }}>選擇標籤</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {ITEM_TAGS.filter(t => t.id !== "memo").map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => handleTagSelect(t.id)}
+                  style={{
+                    padding: "5px 10px", borderRadius: 4, border: "none",
+                    background: item.tag === t.id ? t.color : t.bg,
+                    color: item.tag === t.id ? "#fff" : t.color,
+                    fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                    fontWeight: 600, textAlign: "left",
+                    outline: item.tag === t.id ? `2px solid ${t.color}` : "none",
+                  }}
+                >{t.label}</button>
+              ))}
+              {/* 備忘輸入 */}
+              <div style={{ borderTop: "1px solid #f0f0f0", paddingTop: 8, marginTop: 4 }}>
+                <div style={{ fontSize: 11, color: "#aaa", marginBottom: 4 }}>備忘文字</div>
+                <input
+                  style={{ ...{ border: "1px solid #e0e0e0", borderRadius: 4, padding: "4px 8px", fontSize: 12, width: "100%", boxSizing: "border-box", fontFamily: "inherit", outline: "none" } }}
+                  value={memoText}
+                  onChange={e => setMemoText(e.target.value)}
+                  placeholder="輸入備忘內容…"
+                  onKeyDown={e => e.key === "Enter" && handleMemoSave()}
+                />
+                <button
+                  onClick={handleMemoSave}
+                  style={{ marginTop: 6, width: "100%", padding: "4px", borderRadius: 4, border: "none", background: "#6a96b0", color: "#fff", fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}
+                >儲存備忘</button>
+              </div>
+              {/* 移除標籤 */}
+              {item.tag && (
+                <button
+                  onClick={() => { onUpdate({ tag: null, tagMemo: null }); setShowTagMenu(false); }}
+                  style={{ padding: "4px 10px", borderRadius: 4, border: "1px solid #eee", background: "transparent", color: "#bbb", fontSize: 11, cursor: "pointer", fontFamily: "inherit", marginTop: 4 }}
+                >移除標籤</button>
+              )}
+            </div>
+          </div>
+        )}
+
         {item.priceOverride && (
           <button
             title="重設為自動計算"
@@ -2527,8 +2631,27 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
         >✕</button>
       </div>
     </div>
+
+    {/* 備忘文字顯示 */}
+    {item.tag === "memo" && item.tagMemo && (
+      <div style={{
+        paddingLeft: 32, paddingBottom: 4,
+        fontSize: 11, color: "#6a96b0", fontStyle: "italic",
+      }}>
+        💬 {item.tagMemo}
+      </div>
+    )}
+    </div>
   );
 }
+
+// ─── 品項標籤常數 ────────────────────────────────────────────
+const ITEM_TAGS = [
+  { id: "pending",  label: "待確認", color: "#c9a84c", bg: "#fdf6e3" },
+  { id: "need_fix", label: "需修改", color: "#c0675a", bg: "#fdf0ee" },
+  { id: "done",     label: "已確認", color: "#6aaa8a", bg: "#f0f8f4" },
+  { id: "memo",     label: "備忘",   color: "#6a96b0", bg: "#eef4f8" },
+];
 
 // ─── 列印版面 ───────────────────────────────────────────────
 function PrintView({ quote, items, summary, settings, mode, onClose }) {
@@ -3272,10 +3395,24 @@ function InternalCostView({ quote, items, summary, settings, isIntegrated }) {
       const costTotal = Math.round(toNum(it.cost) * toNum(it.qty));
       const profit = toNum(it.total) - costTotal;
       const itemMargin = toNum(it.total) > 0 ? Math.round((profit / toNum(it.total)) * 100) : 0;
+      const tag = ITEM_TAGS.find(t => t.id === it.tag);
       return (
-        <tr key={it.id} style={{ background: i % 2 === 0 ? "#fff" : "#fdfdfb" }}>
+        <tr key={it.id} style={{ background: tag ? tag.bg : i % 2 === 0 ? "#fff" : "#fdfdfb" }}>
           <td style={{ ...cell, color: "#aaa", textAlign: "center" }}>{i + 1}</td>
-          <td style={cell}>{it.itemName}</td>
+          <td style={cell}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {tag && (
+                <span style={{
+                  fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 3,
+                  background: tag.color, color: "#fff", whiteSpace: "nowrap",
+                }}>{tag.label}</span>
+              )}
+              {it.itemName}
+              {it.tag === "memo" && it.tagMemo && (
+                <span style={{ fontSize: 10, color: "#6a96b0", fontStyle: "italic" }}>（{it.tagMemo}）</span>
+              )}
+            </div>
+          </td>
           <td style={cellC}>{it.unit}</td>
           <td style={cellC}>{it.qty}</td>
           <td style={cellR}>{it.cost ? fmt(it.cost) : "—"}</td>
