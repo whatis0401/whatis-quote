@@ -1292,9 +1292,17 @@ function AiQueryPanel({ categoryName, groupName, onAddItems, onClose }) {
   const [parsedItems, setParsedItems] = useState([]);
   const [parseError, setParseError] = useState("");
   const [step, setStep] = useState("query"); // query | paste | review
+  const [selectedAi, setSelectedAi] = useState("Claude");
 
-  // 組建提示詞
-  const promptText = `我是台灣室內設計師，需要報價以下品項，請用表格回覆，欄位為：品項名稱、單位、數量、成本單價（台灣市場2024-2025行情）、建議利潤乘數（1.3~1.6之間）、備註。
+  const AI_OPTIONS = [
+    { name: "Claude",  url: "https://claude.ai",          color: "#c9693a", bg: "#fdf3ee" },
+    { name: "ChatGPT", url: "https://chatgpt.com",         color: "#10a37f", bg: "#edfaf5" },
+    { name: "Gemini",  url: "https://gemini.google.com",   color: "#4285f4", bg: "#eef3fd" },
+  ];
+
+  // 各 AI 的提示詞
+  const promptTexts = {
+    Claude: `我是台灣室內設計師，需要報價以下品項，請用表格回覆，欄位為：品項名稱、單位、數量、成本單價（台灣市場2024-2025行情）、建議利潤乘數（1.3~1.6之間）、備註。
 
 品項：${query}
 
@@ -1302,11 +1310,46 @@ function AiQueryPanel({ categoryName, groupName, onAddItems, onClose }) {
 1. 拆解成完整的施工細項（例如桶身、門片、五金、安裝工資等）
 2. 成本單價為台灣市場實際行情（不含利潤）
 3. 建議乘數依工種難度設定（簡單工種1.3、中等1.4、複雜1.5-1.6）
-4. 只輸出表格，不要其他說明文字`;
+4. 只輸出表格，不要其他說明文字`,
 
-  function handleCopyAndOpen() {
-    navigator.clipboard.writeText(promptText).catch(() => {});
-    window.open("https://claude.ai", "_blank");
+    ChatGPT: `我是台灣室內設計師，需要報價以下品項，請嚴格按照格式輸出表格，不得有任何額外說明、前言、後記或格式符號。
+
+品項：${query}
+
+輸出格式（每欄用 | 分隔，不要用 Markdown 的 --- 分隔線，不要用 code block）：
+品項名稱 | 單位 | 數量 | 成本單價 | 建議乘數 | 備註
+
+嚴格規則：
+1. 第一行輸出欄位標題，之後每行一個施工細項
+2. 拆解成完整施工細項（桶身、門片、五金、安裝工資等）
+3. 成本單價為台灣市場2024-2025實際行情（不含利潤）
+4. 建議乘數：簡單工種1.3、中等1.4、複雜1.5-1.6
+5. 所有數字去除千分位逗號，只輸出純數字
+6. 不要輸出任何表格以外的文字，不要使用 Markdown 格式
+7. 使用繁體中文`,
+
+    Gemini: `我是台灣室內設計師，需要報價以下品項，請使用繁體中文，輸出純文字格式的表格。
+
+品項：${query}
+
+輸出格式（用 | 符號分隔每個欄位）：
+品項名稱 | 單位 | 數量 | 成本單價 | 建議乘數 | 備註
+
+處理規則：
+1. 第一行是欄位標題，之後每行一個施工細項
+2. 拆解成完整施工細項（桶身、門片、五金、安裝工資等）
+3. 成本單價為台灣市場2024-2025實際行情（不含利潤）
+4. 建議乘數：簡單工種1.3、中等1.4、複雜1.5-1.6
+5. 數字去掉千分位逗號，只保留純數字
+6. 只輸出表格內容，不要任何前言、說明或結語
+7. 不要用 Markdown 的 \`\`\` 包住輸出，全程使用繁體中文`,
+  };
+
+  function handleCopyAndOpen(aiName, aiUrl) {
+    const prompt = promptTexts[aiName] || promptTexts.Claude;
+    navigator.clipboard.writeText(prompt).catch(() => {});
+    window.open(aiUrl, "_blank");
+    setSelectedAi(aiName);
     setStep("paste");
   }
 
@@ -1402,12 +1445,28 @@ function AiQueryPanel({ categoryName, groupName, onAddItems, onClose }) {
               placeholder={`例：主臥室 / 系統櫃工程 / 高櫃體 W90×H240×D60`}
             />
             <div style={{ fontSize: 12, color: "#aaa", marginBottom: 16, padding: "10px 12px", background: "#f9f9f9", borderRadius: 4, lineHeight: 1.7 }}>
-              點「開始詢問」後，系統會自動複製提示詞並開啟 Claude.ai。
+              選擇 AI 後，系統自動複製提示詞並開啟該平台。
               貼上提示詞（Ctrl+V）→ 取得回覆 → 複製表格回來。
             </div>
-            <button style={{ ...S.btn, width: "100%" }} onClick={handleCopyAndOpen}>
-              開始詢問（複製提示詞 + 開啟 Claude.ai）
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {AI_OPTIONS.map(ai => (
+                <button
+                  key={ai.name}
+                  style={{
+                    width: "100%", padding: "10px 16px",
+                    borderRadius: 4, border: `1px solid ${ai.color}`,
+                    background: ai.bg, color: ai.color,
+                    fontSize: 13, fontWeight: 600, cursor: "pointer",
+                    fontFamily: "inherit", textAlign: "left",
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                  }}
+                  onClick={() => handleCopyAndOpen(ai.name, ai.url)}
+                >
+                  <span>開始詢問 + 開啟 {ai.name}</span>
+                  <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>→</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -1415,9 +1474,9 @@ function AiQueryPanel({ categoryName, groupName, onAddItems, onClose }) {
         {step === "paste" && (
           <div>
             <div style={{ fontSize: 12, color: "#6aaa8a", marginBottom: 12, padding: "10px 12px", background: "#f0f8f4", borderRadius: 4 }}>
-              ✓ 提示詞已複製到剪貼簿，請到 Claude.ai 貼上後，把回覆的表格複製回來
+              ✓ 提示詞已複製，請到 {selectedAi} 貼上後，把回覆的表格複製回來
             </div>
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>將 Claude 回覆的表格貼到下方：</div>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>將 {selectedAi} 回覆的表格貼到下方：</div>
             <textarea
               style={{ ...S.input, height: 200, resize: "vertical", fontSize: 12, fontFamily: "monospace" }}
               value={pasteText}
@@ -1504,8 +1563,16 @@ function ImportQuotePanel({ categoryName, groupName, onAddItems, onClose }) {
   const [parseError, setParseError] = useState("");
   const [step, setStep] = useState("guide"); // guide | paste | review
   const [batchMultiplier, setBatchMultiplier] = useState("");
+  const [selectedAi, setSelectedAi] = useState("Claude");
 
-  const promptText = `請解析以下附件（廠商報價單），將所有品項整理成表格輸出。
+  const AI_OPTIONS = [
+    { name: "Claude",  url: "https://claude.ai",          color: "#c9693a", bg: "#fdf3ee" },
+    { name: "ChatGPT", url: "https://chatgpt.com",         color: "#10a37f", bg: "#edfaf5" },
+    { name: "Gemini",  url: "https://gemini.google.com",   color: "#4285f4", bg: "#eef3fd" },
+  ];
+
+  const promptTexts = {
+    Claude: `請解析以下附件（廠商報價單），將所有品項整理成表格輸出。
 
 輸出格式（用 | 分隔欄位）：
 品項名稱 | 單位 | 數量 | 單價 | 總價 | 備註
@@ -1515,11 +1582,42 @@ function ImportQuotePanel({ categoryName, groupName, onAddItems, onClose }) {
 2. 如果只有單價沒有總價，請自動計算：總價 = 單價 × 數量
 3. 數字去除千分位符號（逗號），只輸出純數字
 4. 第一行輸出欄位標題，之後每行一個品項
-5. 只輸出表格，不要其他說明文字`;
+5. 只輸出表格，不要其他說明文字`,
 
-  function handleCopyAndOpen() {
-    navigator.clipboard.writeText(promptText).catch(() => {});
-    window.open("https://claude.ai", "_blank");
+    ChatGPT: `請解析附件中的廠商報價單，嚴格按照以下格式輸出，不得有任何額外說明、前言、後記或格式符號。
+
+輸出格式（每欄用 | 分隔，不要用 Markdown 的 --- 分隔線，不要用 code block）：
+品項名稱 | 單位 | 數量 | 單價 | 總價 | 備註
+
+嚴格規則：
+1. 第一行輸出欄位標題，之後每行一個品項
+2. 如果只有總價沒有單價：單價 = 總價 ÷ 數量（四捨五入到整數）
+3. 如果只有單價沒有總價：總價 = 單價 × 數量
+4. 所有數字去除千分位逗號，只輸出純數字
+5. 不要輸出任何表格以外的文字
+6. 不要使用 Markdown 格式
+7. 使用繁體中文`,
+
+    Gemini: `請分析附件中的廠商報價單，使用繁體中文，輸出純文字格式的表格。
+
+輸出格式（用 | 符號分隔每個欄位）：
+品項名稱 | 單位 | 數量 | 單價 | 總價 | 備註
+
+處理規則：
+1. 第一行是欄位標題，之後每行代表一個報價品項
+2. 如果只有總價沒有單價：計算 單價 = 總價 ÷ 數量
+3. 如果只有單價沒有總價：計算 總價 = 單價 × 數量
+4. 數字去掉千分位逗號，只保留純數字
+5. 只輸出表格內容，不要任何前言、說明或結語
+6. 不要用 Markdown 的 \`\`\` 包住輸出
+7. 全程使用繁體中文`,
+  };
+
+  function handleCopyAndOpen(aiName, aiUrl) {
+    const prompt = promptTexts[aiName] || promptTexts.Claude;
+    navigator.clipboard.writeText(prompt).catch(() => {});
+    window.open(aiUrl, "_blank");
+    setSelectedAi(aiName);
     setStep("paste");
   }
 
@@ -1637,11 +1735,30 @@ function ImportQuotePanel({ categoryName, groupName, onAddItems, onClose }) {
             ))}
             <div style={{ marginTop: 20, padding: "12px", background: "#f9f9f7", borderRadius: 4, fontSize: 11, color: "#aaa", lineHeight: 1.7 }}>
               支援格式：圖片（JPG/PNG）、PDF、Excel 截圖<br />
-              不論廠商格式如何，Claude 都能自動識別欄位
+              不論廠商格式如何，AI 都能自動識別欄位
             </div>
-            <button style={{ ...S.btn, width: "100%", marginTop: 16 }} onClick={handleCopyAndOpen}>
-              複製提示詞 + 開啟 Claude.ai
-            </button>
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 11, color: "#888", marginBottom: 8 }}>選擇 AI 平台：</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {AI_OPTIONS.map(ai => (
+                  <button
+                    key={ai.name}
+                    style={{
+                      width: "100%", padding: "10px 16px",
+                      borderRadius: 4, border: `1px solid ${ai.color}`,
+                      background: ai.bg, color: ai.color,
+                      fontSize: 13, fontWeight: 600, cursor: "pointer",
+                      fontFamily: "inherit", textAlign: "left",
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                    }}
+                    onClick={() => handleCopyAndOpen(ai.name, ai.url)}
+                  >
+                    <span>複製提示詞 + 開啟 {ai.name}</span>
+                    <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>→</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1649,7 +1766,7 @@ function ImportQuotePanel({ categoryName, groupName, onAddItems, onClose }) {
         {step === "paste" && (
           <div>
             <div style={{ fontSize: 12, color: "#6aaa8a", marginBottom: 12, padding: "10px 12px", background: "#f0f8f4", borderRadius: 4 }}>
-              ✓ 提示詞已複製，請上傳廠商報價單到 Claude.ai，取得回覆後把表格複製回來
+              ✓ 提示詞已複製，請上傳廠商報價單到 {selectedAi}，取得回覆後把表格複製回來
             </div>
             <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>將 Claude 回覆的表格貼到下方：</div>
             <textarea
