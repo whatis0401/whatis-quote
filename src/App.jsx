@@ -1978,6 +1978,32 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
     onChange(next.map((it, i) => ({ ...it, sortOrder: i })));
   }
 
+  function insertItemAfter(afterId) {
+    const idx = items.findIndex(it => it.id === afterId);
+    const afterItem = items[idx];
+    const newItem = {
+      id: genId(),
+      quoteId: quote.id,
+      group: afterItem?.group || "",
+      category: afterItem?.category || "",
+      position: "",
+      itemName: "",
+      unit: "式",
+      qty: 1,
+      cost: 0,
+      multiplier: 1,
+      price: 0,
+      priceOverride: false,
+      total: 0,
+      note: "",
+      sortOrder: 0,
+      updatedAt: now(),
+    };
+    const next = [...items];
+    next.splice(idx + 1, 0, newItem);
+    onChange(next.map((it, i) => ({ ...it, sortOrder: i })));
+  }
+
   // 獨立品項：直接顯示列表
   if (!isIntegrated) {
     const showPosition = true;
@@ -2018,6 +2044,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
           onRemove={removeItem}
           onMove={moveItem}
           onReorder={reorderItem}
+          onInsertAfter={insertItemAfter}
         />
 
         {/* AI 詢問面板 */}
@@ -2184,6 +2211,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
                       onRemove={removeItem}
                       onMove={moveItem}
                       onReorder={reorderItem}
+          onInsertAfter={insertItemAfter}
                     />
                   )}
                 </div>
@@ -2200,6 +2228,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
                 onRemove={removeItem}
                 onMove={moveItem}
                       onReorder={reorderItem}
+          onInsertAfter={insertItemAfter}
               />
             )}
           </div>
@@ -2218,6 +2247,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
             onRemove={removeItem}
             onMove={moveItem}
                       onReorder={reorderItem}
+          onInsertAfter={insertItemAfter}
           />
         </div>
       )}
@@ -2296,7 +2326,7 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
 }
 
 // ─── 品項表格 ───────────────────────────────────────────────
-function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove, onMove, onReorder }) {
+function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove, onMove, onReorder, onInsertAfter }) {
   const colWidths = showPosition
     ? "24px 60px 60px 1fr 60px 80px 90px 90px 90px 90px 80px 50px"
     : "24px 60px 1fr 60px 80px 90px 90px 90px 90px 80px 50px";
@@ -2352,6 +2382,7 @@ function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove,
             isDragOver={dragOverId === it.id}
             onUpdate={(patch) => onUpdate(it.id, patch)}
             onRemove={() => onRemove(it.id)}
+            onInsertAfter={() => onInsertAfter && onInsertAfter(it.id)}
             onDragOver={(e) => handleDragOver(e, it.id)}
             onDrop={(e) => handleDrop(e, it.id)}
             onDragLeave={() => setDragOverId(null)}
@@ -2368,6 +2399,7 @@ function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove,
             onRemove={() => onRemove(it.id)}
             onMoveUp={() => onMove(it.id, "up")}
             onMoveDown={() => onMove(it.id, "down")}
+            onInsertAfter={() => onInsertAfter && onInsertAfter(it.id)}
             onDragOver={(e) => handleDragOver(e, it.id)}
             onDrop={(e) => handleDrop(e, it.id)}
             onDragLeave={() => setDragOverId(null)}
@@ -2385,11 +2417,16 @@ function ItemTable({ items, showPosition, showGroupCategory, onUpdate, onRemove,
 }
 
 // ─── 分隔標題列 ─────────────────────────────────────────────
-function SectionRow({ item, isDragOver, onUpdate, onRemove, onDragOver, onDrop, onDragLeave }) {
+function SectionRow({ item, isDragOver, onUpdate, onRemove, onDragOver, onDrop, onDragLeave, onInsertAfter }) {
   const [editing, setEditing] = useState(false);
   const [hover, setHover] = useState(false);
 
   return (
+    <div
+      style={{ position: "relative" }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
     <div
       draggable
       onDragStart={e => e.dataTransfer.setData("itemId", item.id)}
@@ -2448,11 +2485,30 @@ function SectionRow({ item, isDragOver, onUpdate, onRemove, onDragOver, onDrop, 
         >✕</button>
       )}
     </div>
+
+    {/* 插入線 */}
+    {hover && onInsertAfter && (
+      <div
+        onClick={onInsertAfter}
+        style={{
+          position: "absolute", bottom: -1, left: 0, right: 0,
+          height: 6, zIndex: 10, cursor: "pointer",
+          display: "flex", alignItems: "center",
+        }}
+        title="在此處插入新品項"
+      >
+        <div style={{ width: "100%", height: 2, background: "#888", position: "relative", display: "flex", alignItems: "center" }}>
+          <div style={{ position: "absolute", left: 8, width: 16, height: 16, borderRadius: "50%", background: "#888", color: "#fff", fontSize: 14, lineHeight: "16px", textAlign: "center", marginTop: -1 }}>＋</div>
+        </div>
+      </div>
+    )}
+    </div>
   );
 }
 
-function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onMoveUp, onMoveDown, onDragOver, onDrop, onDragLeave, isDragOver }) {
+function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onMoveUp, onMoveDown, onDragOver, onDrop, onDragLeave, isDragOver, onInsertAfter }) {
   const [hover, setHover] = useState(false);
+  const [showInsert, setShowInsert] = useState(false);
   const [priceRef, setPriceRef] = useState(null);
   const [searching, setSearching] = useState(false);
   const [showTagMenu, setShowTagMenu] = useState(false);
@@ -2507,7 +2563,11 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
   const numStyle = { ...inputStyle, textAlign: "right" };
 
   return (
-    <div style={{ position: "relative" }}>
+    <div
+      style={{ position: "relative" }}
+      onMouseEnter={() => setShowInsert(true)}
+      onMouseLeave={() => setShowInsert(false)}
+    >
       {/* 標籤標示（左側色條） */}
       {currentTag && (
         <div style={{
@@ -2756,6 +2816,34 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
         fontSize: 11, color: "#6a96b0", fontStyle: "italic",
       }}>
         💬 {item.tagMemo}
+      </div>
+    )}
+
+    {/* 插入線 */}
+    {showInsert && onInsertAfter && (
+      <div
+        onClick={onInsertAfter}
+        style={{
+          position: "absolute", bottom: -1, left: 0, right: 0,
+          height: 6, zIndex: 10, cursor: "pointer",
+          display: "flex", alignItems: "center",
+        }}
+        title="在此處插入新品項"
+      >
+        <div style={{
+          width: "100%", height: 2,
+          background: "#888",
+          position: "relative",
+          display: "flex", alignItems: "center",
+        }}>
+          <div style={{
+            position: "absolute", left: 8,
+            width: 16, height: 16, borderRadius: "50%",
+            background: "#888", color: "#fff",
+            fontSize: 14, lineHeight: "16px", textAlign: "center",
+            marginTop: -1,
+          }}>＋</div>
+        </div>
       </div>
     )}
     </div>
