@@ -3324,7 +3324,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                 </tr>
               )}
               <tr style={{ fontWeight: 700, fontSize: 15 }}>
-                <td style={{ ...label, borderTop: "2px solid #333" }}>含稅</td>
+                <td style={{ ...label, borderTop: "2px solid #333" }}>總價</td>
                 <td style={{ ...amount, borderTop: "2px solid #333", color: adj.totalColor }}>${fmt(summary.total)}</td>
               </tr>
             </tbody>
