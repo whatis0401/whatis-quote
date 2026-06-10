@@ -1043,6 +1043,10 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
                   <div style={{ fontSize: 12, color: "#888" }}>{pQuotes.length} 張</div>
                   <div style={{ fontSize: 12, color: "#aaa" }}>{isOpen ? "▲" : "▼"}</div>
                   <button
+                    style={{ ...S.btnSecondary, padding: "2px 8px", fontSize: 11 }}
+                    onClick={e => { e.stopPropagation(); setEditingProjectId(p.id); }}
+                  >重命名</button>
+                  <button
                     style={{ ...S.btnDanger, padding: "2px 8px", fontSize: 11 }}
                     onClick={e => { e.stopPropagation(); removeProject(p.id); }}
                   >刪除</button>
@@ -1050,7 +1054,7 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
 
                 {/* 資料夾內容 */}
                 {isOpen && (
-                  <div style={{ border: "1px solid #e8e8e8", borderTop: "none", borderRadius: "0 0 6px 6px", overflow: "hidden" }}>
+                  <div style={{ border: "1px solid #e8e8e8", borderTop: "none", borderRadius: "0 0 6px 6px" }}>
                     {pQuotes.length === 0
                       ? <div style={{ padding: "20px", textAlign: "center", color: "#bbb", fontSize: 13 }}>此資料夾尚無報價單</div>
                       : <>
@@ -1092,7 +1096,7 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
                   <div style={{ fontSize: 12, color: "#aaa" }}>{isOpen ? "▲" : "▼"}</div>
                 </div>
                 {isOpen && uncategorized.length > 0 && (
-                  <div style={{ border: "1px solid #e8e8e8", borderTop: "none", borderRadius: "0 0 6px 6px", overflow: "hidden" }}>
+                  <div style={{ border: "1px solid #e8e8e8", borderTop: "none", borderRadius: "0 0 6px 6px" }}>
                     {tableHeader}
                     {uncategorized.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(q => (
                       <QuoteRow key={q.id} q={q}
