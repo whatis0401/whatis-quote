@@ -75,6 +75,27 @@ async function savePriceDB(items) {
 }
 
 // ─── 資料轉換 ───────────────────────────────────────────────
+function rowsToProjects(rows) {
+  if (!rows || rows.length < 2) return [];
+  const h = rows[0];
+  const idx = (k) => h.indexOf(k);
+  return rows.slice(1).filter(r => r[idx("id")]).map(r => ({
+    id: r[idx("id")],
+    name: r[idx("name")] || "",
+    color: r[idx("color")] || "#888888",
+    sortOrder: toNum(r[idx("sortOrder")]),
+    createdAt: r[idx("createdAt")] || "",
+    updatedAt: r[idx("updatedAt")] || "",
+  }));
+}
+
+function projectsToRows(projects) {
+  const h = ["id", "name", "color", "sortOrder", "createdAt", "updatedAt"];
+  return [h, ...projects.map(p => [
+    p.id, p.name, p.color, p.sortOrder, p.createdAt, p.updatedAt,
+  ])];
+}
+
 function rowsToQuotes(rows) {
   if (!rows || rows.length < 2) return [];
   const h = rows[0];
@@ -84,6 +105,7 @@ function rowsToQuotes(rows) {
     name: r[idx("name")] || "",
     type: r[idx("type")] || "independent",
     status: r[idx("status")] || "draft",
+    projectId: r[idx("projectId")] || "",
     clientName: r[idx("clientName")] || "",
     projectName: r[idx("projectName")] || "",
     projectAddress: r[idx("projectAddress")] || "",
@@ -109,14 +131,14 @@ function rowsToQuotes(rows) {
 
 function quotesToRows(quotes) {
   const h = [
-    "id","name","type","status","clientName","projectName","projectAddress","date",
+    "id","name","type","status","projectId","clientName","projectName","projectAddress","date",
     "managementFeeMode","managementFeeValue","managementFeeBase","managementFeeOverride",
     "taxRate","roundingMode","roundingTarget","showChineseAmount","showBankAccount",
     "bankAccountId","termTemplateId","terms","internalNote","showManagementFeeInClient",
     "createdAt","updatedAt"
   ];
   return [h, ...quotes.map(q => [
-    q.id, q.name, q.type, q.status, q.clientName, q.projectName, q.projectAddress, q.date,
+    q.id, q.name, q.type, q.status, q.projectId || "", q.clientName, q.projectName, q.projectAddress, q.date,
     q.managementFeeMode, q.managementFeeValue, q.managementFeeBase,
     q.managementFeeOverride ?? "",
     q.taxRate, q.roundingMode, q.roundingTarget,
@@ -382,6 +404,7 @@ export default function App() {
   const [quotes, setQuotes] = useState([]);
   const [allItems, setAllItems] = useState([]);
   const [templates, setTemplates] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [settings, setSettings] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -409,11 +432,12 @@ export default function App() {
     }
 
     async function fetchFromGAS() {
-      const [qRows, iRows, tRows, sRows] = await Promise.all([
+      const [qRows, iRows, tRows, sRows, pRows] = await Promise.all([
         sheetGet("Quotes"),
         sheetGet("QuoteItems"),
         sheetGet("Templates"),
         sheetGet("Settings"),
+        sheetGet("Projects"),
       ]);
       const s = parseSettings(rowsToSettings(sRows));
       return {
@@ -421,6 +445,7 @@ export default function App() {
         allItems: rowsToItems(iRows),
         templates: rowsToTemplates(tRows),
         settings: s,
+        projects: rowsToProjects(pRows),
         cachedAt: Date.now(),
       };
     }
@@ -437,6 +462,7 @@ export default function App() {
           setAllItems(data.allItems || []);
           setTemplates(data.templates || []);
           setSettings(data.settings || {});
+          setProjects(data.projects || []);
           setLoading(false);
 
           if (age < CACHE_TTL) {
@@ -446,6 +472,7 @@ export default function App() {
               setAllItems(fresh.allItems);
               setTemplates(fresh.templates);
               setSettings(fresh.settings);
+              setProjects(fresh.projects || []);
               localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
             }).catch(() => {});
             return;
@@ -456,6 +483,7 @@ export default function App() {
             setAllItems(fresh.allItems);
             setTemplates(fresh.templates);
             setSettings(fresh.settings);
+              setProjects(fresh.projects || []);
             localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
           }).catch(e => setNotification({ msg: "背景更新失敗：" + e.message, type: "error" }));
           return;
@@ -471,6 +499,7 @@ export default function App() {
         setAllItems(fresh.allItems);
         setTemplates(fresh.templates);
         setSettings(fresh.settings);
+              setProjects(fresh.projects || []);
         localStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
       } catch (e) {
         setNotification({ msg: "載入失敗：" + e.message, type: "error" });
@@ -483,7 +512,7 @@ export default function App() {
   }, []);
 
   // 儲存
-  const scheduleSave = useCallback((newQuotes, newItems, newSettings) => {
+  const scheduleSave = useCallback((newQuotes, newItems, newSettings, newProjects) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       setSaving(true);
@@ -493,7 +522,6 @@ export default function App() {
         const saveI = newItems ?? ai;
         const saveS = newSettings ?? s;
 
-        // 設定要序列化 JSON 欄位
         const serialSettings = { ...saveS };
         ["bank_accounts","engineering_groups","engineering_categories","term_templates"].forEach(k => {
           if (Array.isArray(serialSettings[k])) {
@@ -504,6 +532,7 @@ export default function App() {
         const ops = [sheetPut("Quotes", quotesToRows(saveQ))];
         if (newItems !== undefined) ops.push(sheetPut("QuoteItems", itemsToRows(saveI)));
         if (newSettings !== undefined) ops.push(sheetPut("Settings", settingsToRows(serialSettings)));
+        if (newProjects !== undefined) ops.push(sheetPut("Projects", projectsToRows(newProjects)));
 
         await Promise.all(ops);
         localStorage.removeItem("whatis_quote_cache");
@@ -631,6 +660,16 @@ export default function App() {
               const next = quotes.map(q => q.id === id ? { ...q, status, updatedAt: now() } : q);
               updateQuotes(next);
             }}
+            projects={projects}
+            onProjectsChange={(newProjects) => {
+              setProjects(newProjects);
+              scheduleSave(undefined, undefined, undefined, newProjects);
+            }}
+            onMoveToProject={(quoteId, projectId) => {
+              const next = quotes.map(q => q.id === quoteId ? { ...q, projectId, updatedAt: now() } : q);
+              setQuotes(next);
+              scheduleSave(next);
+            }}
           />
         )}
         {page === "edit" && editQuoteId && (
@@ -734,75 +773,211 @@ function Sidebar({ page, setPage }) {
   );
 }
 
+// ─── 報價單列（獨立元件）────────────────────────────────────
+function QuoteRow({ q, allItems, sortedProjects, showProjectMenu, setShowProjectMenu, onEdit, onStatusChange, onMoveToProject, onDuplicate, onDelete }) {
+  const items = allItems.filter(it => it.quoteId === q.id).map(calcItem);
+  const summary = calcQuoteSummary(items, q);
+  return (
+    <div
+      style={{
+        ...S.card, padding: "14px 20px", borderRadius: 4,
+        display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 100px",
+        alignItems: "center", gap: 8, cursor: "pointer", transition: "border-color 0.15s", marginBottom: 1,
+      }}
+      onMouseEnter={e => e.currentTarget.style.borderColor = "#ccc"}
+      onMouseLeave={e => e.currentTarget.style.borderColor = "#e8e8e8"}
+      onClick={() => onEdit(q.id)}
+    >
+      <div>
+        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{q.name}</div>
+        {q.projectName && <div style={{ fontSize: 12, color: "#888" }}>{q.projectName}</div>}
+      </div>
+      <div style={{ fontSize: 13, color: "#555" }}>{q.clientName || "—"}</div>
+      <div style={{ fontSize: 13, color: "#888" }}>{q.date || "—"}</div>
+      <div style={{ fontSize: 14, fontWeight: 600, color: "#333" }}>
+        {summary.total > 0 ? `$${fmt(summary.total)}` : "—"}
+      </div>
+      <div style={{ fontSize: 12, color: "#888" }}>{TYPE_LABELS[q.type]}</div>
+      <div>
+        <select
+          value={q.status}
+          onClick={e => e.stopPropagation()}
+          onChange={e => { e.stopPropagation(); onStatusChange(q.id, e.target.value); }}
+          style={{ ...S.select, fontSize: 12, padding: "4px 8px", color: STATUS_COLORS[q.status], fontWeight: 600 }}
+        >
+          {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      </div>
+      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+        <div style={{ position: "relative" }}>
+          <button
+            style={{ ...S.btnSecondary, padding: "4px 8px", fontSize: 11 }}
+            onClick={e => { e.stopPropagation(); setShowProjectMenu(showProjectMenu === q.id ? null : q.id); }}
+            title="移至資料夾"
+          >📁</button>
+          {showProjectMenu === q.id && (
+            <div style={{
+              position: "absolute", right: 0, top: 28, zIndex: 50,
+              background: "#fff", border: "1px solid #e0e0e0", borderRadius: 4,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.1)", minWidth: 160, overflow: "hidden",
+            }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: "6px 12px", fontSize: 11, color: "#aaa", borderBottom: "1px solid #f0f0f0" }}>移至資料夾</div>
+              <div
+                style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12 }}
+                onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                onClick={() => { onMoveToProject(q.id, ""); setShowProjectMenu(null); }}
+              >未分類</div>
+              {sortedProjects.map(p => (
+                <div key={p.id}
+                  style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  onClick={() => { onMoveToProject(q.id, p.id); setShowProjectMenu(null); }}
+                >
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.color, flexShrink: 0 }} />
+                  {p.name}
+                  {q.projectId === p.id && <span style={{ fontSize: 10, color: "#aaa" }}>（目前）</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <button style={{ ...S.btnSecondary, padding: "4px 8px", fontSize: 11 }}
+          onClick={e => { e.stopPropagation(); onDuplicate(q.id); }}>複製</button>
+        <button style={{ ...S.btnDanger, padding: "4px 8px", fontSize: 11 }}
+          onClick={e => { e.stopPropagation(); onDelete(q.id); }}>刪除</button>
+      </div>
+    </div>
+  );
+}
+
 // ─── 報價單列表 ─────────────────────────────────────────────
-function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDuplicate, onStatusChange }) {
+function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDuplicate, onStatusChange, projects, onProjectsChange, onMoveToProject }) {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [showNewMenu, setShowNewMenu] = useState(false);
+  const [expandedProjects, setExpandedProjects] = useState({});
+  const [editingProjectId, setEditingProjectId] = useState(null);
+  const [showProjectMenu, setShowProjectMenu] = useState(null); // quoteId
+  const [showAddProject, setShowAddProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState("");
+
+  const PROJECT_COLORS = ["#888", "#6a96b0", "#6aaa8a", "#c9a84c", "#c0675a", "#a06ab0"];
+
+  function toggleProject(id) {
+    setExpandedProjects(prev => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function addProject() {
+    if (!newProjectName.trim()) return;
+    const newP = {
+      id: genId(),
+      name: newProjectName.trim(),
+      color: PROJECT_COLORS[projects.length % PROJECT_COLORS.length],
+      sortOrder: projects.length + 1,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    onProjectsChange([...projects, newP]);
+    setNewProjectName("");
+    setShowAddProject(false);
+    setExpandedProjects(prev => ({ ...prev, [newP.id]: true }));
+  }
+
+  function removeProject(id) {
+    if (!confirm("確定刪除此資料夾？報價單會移至未分類。")) return;
+    onProjectsChange(projects.filter(p => p.id !== id));
+    // 將該資料夾的報價單移至未分類
+    quotes.filter(q => q.projectId === id).forEach(q => onMoveToProject(q.id, ""));
+  }
+
+  function updateProjectName(id, name) {
+    onProjectsChange(projects.map(p => p.id === id ? { ...p, name, updatedAt: now() } : p));
+  }
+
+  const sortedProjects = [...projects].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  const uncategorized = quotes.filter(q => !q.projectId || !projects.find(p => p.id === q.projectId));
 
   const filtered = quotes.filter(q => {
-    const matchSearch = !search ||
-      q.name.includes(search) || q.clientName.includes(search) || q.projectName.includes(search);
+    const matchSearch = !search || q.name.includes(search) || q.clientName.includes(search) || q.projectName.includes(search);
     const matchStatus = filterStatus === "all" || q.status === filterStatus;
     const matchType = filterType === "all" || q.type === filterType;
     return matchSearch && matchStatus && matchType;
   }).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
+  const tableHeader = (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 100px",
+      padding: "8px 20px", fontSize: 11, color: "#aaa", fontWeight: 600, letterSpacing: 0.5,
+    }}>
+      <div>報價單名稱</div><div>客戶</div><div>日期</div>
+      <div>金額（含稅）</div><div>類型</div><div>狀態</div><div></div>
+    </div>
+  );
+
   return (
-    <div>
+    <div onClick={() => { setShowNewMenu(false); setShowProjectMenu(null); }}>
       {/* 標題列 */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: 0.5 }}>報價單列表</h1>
           <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>共 {quotes.length} 張</div>
         </div>
-        <div style={{ position: "relative" }}>
-          <button style={S.btn} onClick={() => setShowNewMenu(!showNewMenu)}>
-            ＋ 新增報價單
+        <div style={{ display: "flex", gap: 10 }}>
+          <button style={S.btnSecondary} onClick={e => { e.stopPropagation(); setShowAddProject(!showAddProject); }}>
+            ＋ 新增資料夾
           </button>
-          {showNewMenu && (
-            <div style={{
-              position: "absolute", right: 0, top: 40,
-              background: "#fff", border: "1px solid #e0e0e0",
-              borderRadius: 4, boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-              zIndex: 100, minWidth: 180, overflow: "hidden",
-            }}>
-              {[
-                { type: "independent", label: "獨立品項報價" },
-                { type: "integrated", label: "整合式工程報價" },
-                { type: "template", label: "從模板新增" },
-                { type: "addendum", label: "追加減帳報價" },
-              ].map(opt => (
-                <button
-                  key={opt.type}
-                  onClick={() => { setShowNewMenu(false); onNew(opt.type); }}
-                  style={{
-                    display: "block", width: "100%", textAlign: "left",
-                    padding: "11px 16px", border: "none", background: "transparent",
-                    fontSize: 13, color: "#333", cursor: "pointer",
-                    fontFamily: "inherit",
-                    borderBottom: "1px solid #f0f0f0",
-                  }}
-                  onMouseEnter={e => e.target.style.background = "#f5f5f5"}
-                  onMouseLeave={e => e.target.style.background = "transparent"}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
+          <div style={{ position: "relative" }}>
+            <button style={S.btn} onClick={e => { e.stopPropagation(); setShowNewMenu(!showNewMenu); }}>
+              ＋ 新增報價單
+            </button>
+            {showNewMenu && (
+              <div style={{
+                position: "absolute", right: 0, top: 40,
+                background: "#fff", border: "1px solid #e0e0e0",
+                borderRadius: 4, boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                zIndex: 100, minWidth: 180, overflow: "hidden",
+              }} onClick={e => e.stopPropagation()}>
+                {[
+                  { type: "independent", label: "獨立品項報價" },
+                  { type: "integrated", label: "整合式工程報價" },
+                  { type: "template", label: "從模板新增" },
+                  { type: "addendum", label: "追加減帳報價" },
+                ].map(opt => (
+                  <button key={opt.type} onClick={() => { setShowNewMenu(false); onNew(opt.type); }}
+                    style={{ display: "block", width: "100%", textAlign: "left", padding: "11px 16px", border: "none", background: "transparent", fontSize: 13, color: "#333", cursor: "pointer", fontFamily: "inherit", borderBottom: "1px solid #f0f0f0" }}
+                    onMouseEnter={e => e.target.style.background = "#f5f5f5"}
+                    onMouseLeave={e => e.target.style.background = "transparent"}
+                  >{opt.label}</button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* 新增資料夾輸入框 */}
+      {showAddProject && (
+        <div style={{ ...S.card, marginBottom: 16, display: "flex", gap: 10, alignItems: "center" }}>
+          <input
+            autoFocus
+            style={{ ...S.input, flex: 1 }}
+            placeholder="資料夾名稱"
+            value={newProjectName}
+            onChange={e => setNewProjectName(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") addProject(); if (e.key === "Escape") setShowAddProject(false); }}
+          />
+          <button style={S.btn} onClick={addProject}>建立</button>
+          <button style={S.btnSecondary} onClick={() => setShowAddProject(false)}>取消</button>
+        </div>
+      )}
+
       {/* 篩選列 */}
       <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
-        <input
-          style={{ ...S.input, width: 260 }}
-          placeholder="搜尋報價單名稱、客戶、專案…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        <input style={{ ...S.input, width: 260 }} placeholder="搜尋報價單名稱、客戶、專案…" value={search} onChange={e => setSearch(e.target.value)} />
         <select style={S.select} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
           <option value="all">所有狀態</option>
           {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -813,91 +988,125 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
         </select>
       </div>
 
-      {/* 列表 */}
-      {filtered.length === 0 ? (
-        <div style={{ ...S.card, textAlign: "center", padding: "48px", color: "#bbb" }}>
-          尚無報價單，點擊右上角「新增報價單」開始
+      {/* 搜尋結果：不分資料夾顯示 */}
+      {search || filterStatus !== "all" || filterType !== "all" ? (
+        <div>
+          {tableHeader}
+          {filtered.length === 0
+            ? <div style={{ ...S.card, textAlign: "center", padding: 48, color: "#bbb" }}>沒有符合條件的報價單</div>
+            : filtered.map(q => (
+                <QuoteRow key={q.id} q={q}
+                  allItems={allItems} sortedProjects={sortedProjects}
+                  showProjectMenu={showProjectMenu} setShowProjectMenu={setShowProjectMenu}
+                  onEdit={onEdit} onStatusChange={onStatusChange} onMoveToProject={onMoveToProject}
+                  onDuplicate={onDuplicate} onDelete={onDelete}
+                />
+              ))
+          }
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-          {/* 表頭 */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 80px",
-            padding: "8px 20px",
-            fontSize: 11,
-            color: "#aaa",
-            fontWeight: 600,
-            letterSpacing: 0.5,
-          }}>
-            <div>報價單名稱</div>
-            <div>客戶</div>
-            <div>日期</div>
-            <div>金額（含稅）</div>
-            <div>類型</div>
-            <div>狀態</div>
-            <div></div>
-          </div>
-          {filtered.map(q => {
-            const items = allItems.filter(it => it.quoteId === q.id).map(calcItem);
-            const summary = calcQuoteSummary(items, q);
+        <div>
+          {/* 資料夾列表 */}
+          {sortedProjects.map(p => {
+            const pQuotes = quotes.filter(q => q.projectId === p.id).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+            const isOpen = expandedProjects[p.id];
             return (
-              <div
-                key={q.id}
-                style={{
-                  ...S.card,
-                  padding: "16px 20px",
-                  borderRadius: 4,
-                  display: "grid",
-                  gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 80px",
-                  alignItems: "center",
-                  gap: 8,
-                  cursor: "pointer",
-                  transition: "border-color 0.15s",
-                }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = "#ccc"}
-                onMouseLeave={e => e.currentTarget.style.borderColor = "#e8e8e8"}
-                onClick={() => onEdit(q.id)}
-              >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{q.name}</div>
-                  {q.projectName && <div style={{ fontSize: 12, color: "#888" }}>{q.projectName}</div>}
-                </div>
-                <div style={{ fontSize: 13, color: "#555" }}>{q.clientName || "—"}</div>
-                <div style={{ fontSize: 13, color: "#888" }}>{q.date || "—"}</div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: "#333" }}>
-                  {summary.total > 0 ? `$${fmt(summary.total)}` : "—"}
-                </div>
-                <div style={{ fontSize: 12, color: "#888" }}>{TYPE_LABELS[q.type]}</div>
-                <div>
-                  <select
-                    value={q.status}
-                    onClick={e => e.stopPropagation()}
-                    onChange={e => { e.stopPropagation(); onStatusChange(q.id, e.target.value); }}
-                    style={{
-                      ...S.select,
-                      fontSize: 12,
-                      padding: "4px 8px",
-                      color: STATUS_COLORS[q.status],
-                      fontWeight: 600,
-                    }}
-                  >
-                    {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                  </select>
-                </div>
-                <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+              <div key={p.id} style={{ marginBottom: 12 }}>
+                {/* 資料夾標題 */}
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 16px", background: "#f5f5f5",
+                    borderRadius: isOpen ? "6px 6px 0 0" : 6,
+                    border: "1px solid #e8e8e8",
+                    cursor: "pointer", userSelect: "none",
+                  }}
+                  onClick={() => toggleProject(p.id)}
+                >
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: p.color, flexShrink: 0 }} />
+                  {editingProjectId === p.id ? (
+                    <input
+                      autoFocus
+                      style={{ ...S.input, fontSize: 14, fontWeight: 600, flex: 1, padding: "2px 8px" }}
+                      value={p.name}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => updateProjectName(p.id, e.target.value)}
+                      onBlur={() => setEditingProjectId(null)}
+                      onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") setEditingProjectId(null); }}
+                    />
+                  ) : (
+                    <div style={{ fontWeight: 600, fontSize: 14, flex: 1 }}
+                      onDoubleClick={e => { e.stopPropagation(); setEditingProjectId(p.id); }}
+                      title="雙擊修改名稱"
+                    >{p.name}</div>
+                  )}
+                  <div style={{ fontSize: 12, color: "#888" }}>{pQuotes.length} 張</div>
+                  <div style={{ fontSize: 12, color: "#aaa" }}>{isOpen ? "▲" : "▼"}</div>
                   <button
-                    style={{ ...S.btnSecondary, padding: "4px 10px", fontSize: 12 }}
-                    onClick={e => { e.stopPropagation(); onDuplicate(q.id); }}
-                  >複製</button>
-                  <button
-                    style={{ ...S.btnDanger, padding: "4px 10px", fontSize: 12 }}
-                    onClick={e => { e.stopPropagation(); onDelete(q.id); }}
+                    style={{ ...S.btnDanger, padding: "2px 8px", fontSize: 11 }}
+                    onClick={e => { e.stopPropagation(); removeProject(p.id); }}
                   >刪除</button>
                 </div>
+
+                {/* 資料夾內容 */}
+                {isOpen && (
+                  <div style={{ border: "1px solid #e8e8e8", borderTop: "none", borderRadius: "0 0 6px 6px", overflow: "hidden" }}>
+                    {pQuotes.length === 0
+                      ? <div style={{ padding: "20px", textAlign: "center", color: "#bbb", fontSize: 13 }}>此資料夾尚無報價單</div>
+                      : <>
+                          {tableHeader}
+                          {pQuotes.map(q => (
+                            <QuoteRow key={q.id} q={q}
+                              allItems={allItems} sortedProjects={sortedProjects}
+                              showProjectMenu={showProjectMenu} setShowProjectMenu={setShowProjectMenu}
+                              onEdit={onEdit} onStatusChange={onStatusChange} onMoveToProject={onMoveToProject}
+                              onDuplicate={onDuplicate} onDelete={onDelete}
+                            />
+                          ))}
+                        </>
+                    }
+                  </div>
+                )}
               </div>
             );
           })}
+
+          {/* 未分類 */}
+          {(() => {
+            const isOpen = expandedProjects["__uncategorized__"] !== false;
+            return (
+              <div style={{ marginBottom: 12 }}>
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 16px", background: "#f9f9f7",
+                    borderRadius: isOpen && uncategorized.length > 0 ? "6px 6px 0 0" : 6,
+                    border: "1px solid #e8e8e8",
+                    cursor: "pointer", userSelect: "none",
+                  }}
+                  onClick={() => setExpandedProjects(prev => ({ ...prev, __uncategorized__: !isOpen }))}
+                >
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#bbb", flexShrink: 0 }} />
+                  <div style={{ fontWeight: 600, fontSize: 14, flex: 1, color: "#888" }}>未分類</div>
+                  <div style={{ fontSize: 12, color: "#888" }}>{uncategorized.length} 張</div>
+                  <div style={{ fontSize: 12, color: "#aaa" }}>{isOpen ? "▲" : "▼"}</div>
+                </div>
+                {isOpen && uncategorized.length > 0 && (
+                  <div style={{ border: "1px solid #e8e8e8", borderTop: "none", borderRadius: "0 0 6px 6px", overflow: "hidden" }}>
+                    {tableHeader}
+                    {uncategorized.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(q => (
+                      <QuoteRow key={q.id} q={q}
+                        allItems={allItems} sortedProjects={sortedProjects}
+                        showProjectMenu={showProjectMenu} setShowProjectMenu={setShowProjectMenu}
+                        onEdit={onEdit} onStatusChange={onStatusChange} onMoveToProject={onMoveToProject}
+                        onDuplicate={onDuplicate} onDelete={onDelete}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
