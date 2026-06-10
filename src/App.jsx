@@ -3313,20 +3313,27 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                   <td style={amount}>${fmt(summary.roundedBeforeTax)}</td>
                 </tr>
               )}
-              <tr>
-                <td style={{ ...label }}>未稅</td>
-                <td style={amount}>${fmt(summary.roundedBeforeTax || summary.beforeTax)}</td>
-              </tr>
-              {quote.taxRate > 0 && (
-                <tr>
-                  <td style={{ ...label }}>稅金</td>
-                  <td style={amount}>${fmt(summary.taxAmount)}</td>
+              {quote.taxRate > 0 ? (
+                <>
+                  <tr>
+                    <td style={{ ...label }}>未稅</td>
+                    <td style={amount}>${fmt(summary.roundedBeforeTax || summary.beforeTax)}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ ...label }}>稅金</td>
+                    <td style={amount}>${fmt(summary.taxAmount)}</td>
+                  </tr>
+                  <tr style={{ fontWeight: 700, fontSize: 15 }}>
+                    <td style={{ ...label, borderTop: "2px solid #333" }}>總價</td>
+                    <td style={{ ...amount, borderTop: "2px solid #333", color: adj.totalColor }}>${fmt(summary.total)}</td>
+                  </tr>
+                </>
+              ) : (
+                <tr style={{ fontWeight: 700, fontSize: 15 }}>
+                  <td style={{ ...label, borderTop: "2px solid #333", whiteSpace: "nowrap" }}>工程承攬總價</td>
+                  <td style={{ ...amount, borderTop: "2px solid #333", color: adj.totalColor }}>${fmt(summary.total)}</td>
                 </tr>
               )}
-              <tr style={{ fontWeight: 700, fontSize: 15 }}>
-                <td style={{ ...label, borderTop: "2px solid #333" }}>總價</td>
-                <td style={{ ...amount, borderTop: "2px solid #333", color: adj.totalColor }}>${fmt(summary.total)}</td>
-              </tr>
             </tbody>
           </table>
         </div>
@@ -3527,22 +3534,31 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                   <td style={{ padding: "5px 10px", textAlign: "right" }}>{fmt(summary.managementFee)}</td>
                 </tr>
               )}
-              <tr>
-                <td style={{ padding: "5px 10px", fontWeight: 600 }}>合計</td>
-                <td style={{ padding: "5px 10px", textAlign: "right", fontWeight: 700 }}>{fmt(summary.beforeTax)}</td>
-              </tr>
-              {quote.taxRate > 0 && (
-                <tr>
-                  <td style={{ padding: "5px 10px", color: "#555" }}>稅金</td>
-                  <td style={{ padding: "5px 10px", textAlign: "right" }}>{fmt(summary.taxAmount)}</td>
+              {quote.taxRate > 0 ? (
+                <>
+                  <tr>
+                    <td style={{ padding: "5px 10px", fontWeight: 600 }}>未稅</td>
+                    <td style={{ padding: "5px 10px", textAlign: "right", fontWeight: 700 }}>{fmt(summary.beforeTax)}</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: "5px 10px", color: "#555" }}>稅金</td>
+                    <td style={{ padding: "5px 10px", textAlign: "right" }}>{fmt(summary.taxAmount)}</td>
+                  </tr>
+                  <tr style={{ fontWeight: 700 }}>
+                    <td style={{ padding: "6px 10px", borderTop: "2px solid #333" }}>總價</td>
+                    <td style={{ padding: "6px 10px", textAlign: "right", borderTop: "2px solid #333", fontSize: 16, color: adj.totalColor }}>
+                      {fmt(summary.total)}
+                    </td>
+                  </tr>
+                </>
+              ) : (
+                <tr style={{ fontWeight: 700 }}>
+                  <td style={{ padding: "6px 10px", borderTop: "2px solid #333", whiteSpace: "nowrap" }}>工程承攬總價</td>
+                  <td style={{ padding: "6px 10px", textAlign: "right", borderTop: "2px solid #333", fontSize: 16, color: adj.totalColor }}>
+                    {fmt(summary.total)}
+                  </td>
                 </tr>
               )}
-              <tr style={{ fontWeight: 700 }}>
-                <td style={{ padding: "6px 10px", borderTop: "2px solid #333" }}>總計</td>
-                <td style={{ padding: "6px 10px", textAlign: "right", borderTop: "2px solid #333", fontSize: 16, color: adj.totalColor }}>
-                  {fmt(summary.total)}
-                </td>
-              </tr>
             </tbody>
           </table>
         </div>
