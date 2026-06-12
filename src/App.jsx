@@ -897,7 +897,28 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
     onProjectsChange(projects.map(p => p.id === id ? { ...p, name, updatedAt: now() } : p));
   }
 
-  const sortedProjects = [...projects].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+  // 年份排序：名稱開頭的 4 位數字視為年份；無年份的排最下面
+  const [yearSortDir, setYearSortDir] = useState(() => localStorage.getItem("whatis_project_sort") || "desc");
+  function toggleYearSort() {
+    const next = yearSortDir === "desc" ? "asc" : "desc";
+    setYearSortDir(next);
+    localStorage.setItem("whatis_project_sort", next);
+  }
+  function extractYear(name) {
+    const m = (name || "").trim().match(/^(\d{4})/);
+    return m ? Number(m[1]) : null;
+  }
+  const sortedProjects = [...projects].sort((a, b) => {
+    const ya = extractYear(a.name);
+    const yb = extractYear(b.name);
+    if (ya !== null && yb !== null) {
+      if (ya !== yb) return yearSortDir === "desc" ? yb - ya : ya - yb;
+      return a.name.localeCompare(b.name, "zh-Hant");
+    }
+    if (ya !== null) return -1; // 有年份的在前
+    if (yb !== null) return 1;  // 無年份的在後
+    return a.name.localeCompare(b.name, "zh-Hant");
+  });
   const uncategorized = quotes.filter(q => !q.projectId || !projects.find(p => p.id === q.projectId));
 
   const filtered = quotes.filter(q => {
@@ -927,6 +948,13 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
           <div style={{ fontSize: 13, color: "#888", marginTop: 4 }}>共 {quotes.length} 張</div>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
+          <button
+            style={S.btnSecondary}
+            onClick={e => { e.stopPropagation(); toggleYearSort(); }}
+            title="切換資料夾年份排序方向"
+          >
+            {yearSortDir === "desc" ? "年份 新 → 舊" : "年份 舊 → 新"}
+          </button>
           <button style={S.btnSecondary} onClick={e => { e.stopPropagation(); setShowAddProject(!showAddProject); }}>
             ＋ 新增資料夾
           </button>
