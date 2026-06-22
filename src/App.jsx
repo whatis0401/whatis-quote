@@ -2540,9 +2540,44 @@ function ItemsEditor({ quote, items, settings, templates, onChange, onApplyTempl
     const showPosition = true;
     return (
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
           <div style={{ fontSize: 13, color: "#888" }}>共 {items.length} 個品項</div>
-          <div style={{ display: "flex", gap: 10 }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            {/* 批次倍率 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="批次倍率"
+                value={batchMultipliers["__independent__"] || ""}
+                onChange={e => setBatchMultipliers(prev => ({ ...prev, "__independent__": e.target.value }))}
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    const val = parseFloat(batchMultipliers["__independent__"]);
+                    if (!val || val <= 0) return;
+                    const updated = items.map(it =>
+                      it.unit !== "__section__" ? { ...it, multiplier: val, priceOverride: false, updatedAt: now() } : it
+                    );
+                    onChange(updated);
+                    setBatchMultipliers(prev => ({ ...prev, "__independent__": "" }));
+                  }
+                }}
+                style={{ ...S.input, width: 90, padding: "6px 8px", fontSize: 12 }}
+              />
+              <button
+                style={{ ...S.btnSecondary, padding: "6px 10px", fontSize: 12 }}
+                onClick={() => {
+                  const val = parseFloat(batchMultipliers["__independent__"]);
+                  if (!val || val <= 0) return;
+                  const updated = items.map(it =>
+                    it.unit !== "__section__" ? { ...it, multiplier: val, priceOverride: false, updatedAt: now() } : it
+                  );
+                  onChange(updated);
+                  setBatchMultipliers(prev => ({ ...prev, "__independent__": "" }));
+                }}
+                title="套用此倍率到所有品項"
+              >套用</button>
+            </div>
             {templates.filter(t => t.type === "independent").length > 0 && (
               <select
                 style={S.select}
