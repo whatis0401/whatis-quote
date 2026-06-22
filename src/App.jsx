@@ -400,7 +400,7 @@ const S = {
 
 // ─── 主元件 ─────────────────────────────────────────────────
 export default function App() {
-  const [page, setPage] = useState("list"); // list | edit | settings | templates
+  const [page, setPage] = useState("list");
   const [quotes, setQuotes] = useState([]);
   const [allItems, setAllItems] = useState([]);
   const [templates, setTemplates] = useState([]);
@@ -410,6 +410,18 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [editQuoteId, setEditQuoteId] = useState(null);
   const [notification, setNotification] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // 螢幕寬度偵測
+  const [screenW, setScreenW] = useState(window.innerWidth);
+  useEffect(() => {
+    const handler = () => setScreenW(window.innerWidth);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  const isPhone = screenW < 768;
+  const isTablet = screenW >= 768 && screenW < 1200;
+  const isDesktop = screenW >= 1200;
 
   const latestState = useRef({ quotes, allItems, templates, settings });
   useEffect(() => {
@@ -571,11 +583,57 @@ export default function App() {
 
   return (
     <div style={S.page}>
-      {/* 側欄 */}
-      <Sidebar page={page} setPage={setPage} />
 
-      {/* 主內容 */}
-      <div id="main-content" style={S.main}>
+      {/* ── 手機版（唯讀） ── */}
+      {isPhone && (
+        <MobileView
+          quotes={quotes}
+          allItems={allItems}
+          projects={projects}
+          settings={settings}
+        />
+      )}
+
+      {/* ── iPad / 桌面版 ── */}
+      {!isPhone && (
+        <>
+          {/* 側邊欄遮罩（iPad 展開時） */}
+          {isTablet && sidebarOpen && (
+            <div
+              onClick={() => setSidebarOpen(false)}
+              style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 9 }}
+            />
+          )}
+
+          {/* 側邊欄 */}
+          <div id="sidebar" style={{
+            ...S.sidebar,
+            transform: isTablet && !sidebarOpen ? "translateX(-220px)" : "translateX(0)",
+            transition: "transform 0.2s ease",
+          }}>
+            {/* iPad 收折按鈕 */}
+            {isTablet && (
+              <button
+                onClick={() => setSidebarOpen(false)}
+                style={{ position: "absolute", right: -36, top: 16, background: "#fff", border: "1px solid #e0e0e0", borderRadius: "0 4px 4px 0", padding: "6px 10px", cursor: "pointer", fontSize: 14, color: "#888" }}
+              >✕</button>
+            )}
+            <Sidebar page={page} setPage={(p) => { setPage(p); if (isTablet) setSidebarOpen(false); }} />
+          </div>
+
+          {/* 主內容 */}
+          <div id="main-content" style={{
+            ...S.main,
+            marginLeft: isTablet ? 0 : 220,
+            padding: isTablet ? "20px 24px" : "40px 48px",
+          }}>
+            {/* iPad 選單按鈕 */}
+            {isTablet && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                style={{ ...S.btnSecondary, marginBottom: 20, padding: "8px 14px", fontSize: 13 }}
+              >☰ 選單</button>
+            )}
         {page === "list" && (
           <QuoteList
             quotes={quotes}
@@ -716,7 +774,7 @@ export default function App() {
       </div>
 
       {/* 通知 */}
-      {notification && (
+      {!isPhone && notification && (
         <div style={{
           position: "fixed", bottom: 24, right: 24,
           background: notification.type === "error" ? "#c0675a" : notification.type === "success" ? "#6aaa8a" : "#555",
@@ -727,6 +785,238 @@ export default function App() {
           {saving && "儲存中… "}{notification.msg}
         </div>
       )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── 手機唯讀模式 ───────────────────────────────────────────
+function MobileView({ quotes, allItems, projects, settings }) {
+  const [view, setView] = useState("list"); // list | detail | print
+  const [selectedId, setSelectedId] = useState(null);
+  const [search, setSearch] = useState("");
+
+  const selectedQuote = quotes.find(q => q.id === selectedId);
+  const selectedItems = allItems.filter(it => it.quoteId === selectedId).map(calcItem);
+  const summary = selectedQuote ? calcQuoteSummary(selectedItems, selectedQuote) : null;
+
+  const filtered = quotes.filter(q =>
+    !search || q.name.includes(search) || (q.clientName || "").includes(search) || (q.projectName || "").includes(search)
+  ).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+  const bodyFont = '"微軟正黑體","Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif';
+
+  const STATUS_BG = {
+    draft: "#f5f5f5", quoted: "#fdf6e3", confirmed: "#f0f8f4",
+    addendum: "#eef3fd", closed: "#f5f5f5",
+  };
+
+  if (view === "print" && selectedQuote) {
+    return (
+      <div style={{ fontFamily: bodyFont, padding: 16, background: "#fff", minHeight: "100vh" }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          <button onClick={() => setView("detail")}
+            style={{ ...S.btnSecondary, fontSize: 13 }}>← 返回</button>
+          <button onClick={() => window.print()}
+            style={{ ...S.btn, fontSize: 13 }}>列印 / 存 PDF</button>
+        </div>
+        <div style={{ fontSize: 13, color: "#888", marginBottom: 8 }}>
+          列印前建議橫向並設定邊距最小值
+        </div>
+        <iframe
+          src={`${window.location.href}`}
+          style={{ width: "100%", height: "80vh", border: "1px solid #e0e0e0", borderRadius: 4 }}
+          title="列印預覽"
+        />
+      </div>
+    );
+  }
+
+  if (view === "detail" && selectedQuote) {
+    const bankAccount = (settings.bank_accounts || []).find(b => b.id === selectedQuote.bankAccountId);
+    return (
+      <div style={{ fontFamily: bodyFont, background: "#f7f7f5", minHeight: "100vh" }}>
+        {/* 頂部導覽 */}
+        <div style={{ background: "#fff", borderBottom: "1px solid #e8e8e8", padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, position: "sticky", top: 0, zIndex: 10 }}>
+          <button onClick={() => setView("list")}
+            style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#555", padding: 0 }}>←</button>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>{selectedQuote.name}</div>
+            <div style={{ fontSize: 12, color: "#888" }}>{selectedQuote.clientName}</div>
+          </div>
+          <button onClick={() => setView("print")}
+            style={{ ...S.btn, fontSize: 12, padding: "6px 12px" }}>列印</button>
+        </div>
+
+        <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* 基本資訊 */}
+          <div style={{ ...S.card, padding: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 13 }}>
+              {[
+                { label: "工程名稱", value: selectedQuote.projectName },
+                { label: "工程地址", value: selectedQuote.projectAddress },
+                { label: "業主", value: selectedQuote.clientName },
+                { label: "日期", value: selectedQuote.date },
+                { label: "類型", value: TYPE_LABELS[selectedQuote.type] },
+                { label: "狀態", value: STATUS_LABELS[selectedQuote.status] },
+              ].map(f => f.value ? (
+                <div key={f.label}>
+                  <div style={{ fontSize: 11, color: "#aaa", marginBottom: 2 }}>{f.label}</div>
+                  <div style={{ fontWeight: 500 }}>{f.value}</div>
+                </div>
+              ) : null)}
+            </div>
+          </div>
+
+          {/* 金額摘要 */}
+          <div style={{ ...S.card, padding: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: "#555" }}>金額摘要</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#888" }}>小計</span>
+                <span>${fmt(summary.subtotal)}</span>
+              </div>
+              {summary.managementFee > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "#888" }}>管理費</span>
+                  <span>${fmt(summary.managementFee)}</span>
+                </div>
+              )}
+              {selectedQuote.taxRate > 0 && (
+                <>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#888" }}>未稅</span>
+                    <span>${fmt(summary.beforeTax)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#888" }}>稅金（{selectedQuote.taxRate}%）</span>
+                    <span>${fmt(summary.taxAmount)}</span>
+                  </div>
+                </>
+              )}
+              <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 16, borderTop: "2px solid #333", paddingTop: 8, marginTop: 4 }}>
+                <span>{selectedQuote.taxRate > 0 ? "總價" : "工程承攬總價"}</span>
+                <span style={{ color: "#4a8fa8" }}>${fmt(summary.total)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 品項列表 */}
+          <div style={{ ...S.card, padding: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: "#555" }}>品項明細（{selectedItems.filter(it => it.unit !== "__section__").length} 項）</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {selectedItems.map((it, i) => {
+                if (it.unit === "__section__") {
+                  return (
+                    <div key={it.id} style={{ background: "#f0f0ee", padding: "6px 10px", fontSize: 12, fontWeight: 600, color: "#555", marginTop: 8 }}>
+                      {it.itemName}
+                    </div>
+                  );
+                }
+                return (
+                  <div key={it.id} style={{ padding: "8px 0", borderBottom: "1px solid #f5f5f5", fontSize: 12 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                      <div style={{ fontWeight: 500, flex: 1, marginRight: 8 }}>{it.itemName}</div>
+                      <div style={{ fontWeight: 700, color: "#333", whiteSpace: "nowrap" }}>${fmt(it.total)}</div>
+                    </div>
+                    <div style={{ color: "#aaa", fontSize: 11 }}>
+                      {it.unit} × {it.qty} = ${fmt(it.price)}/單位
+                      {it.note ? ` · ${it.note}` : ""}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 備註條款 */}
+          {selectedQuote.terms && (
+            <div style={{ ...S.card, padding: 16, fontSize: 13 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8, color: "#555" }}>備註條款</div>
+              <div style={{ color: "#666", whiteSpace: "pre-line", lineHeight: 1.7 }}>{selectedQuote.terms}</div>
+            </div>
+          )}
+
+          {/* 匯款帳戶 */}
+          {selectedQuote.showBankAccount && bankAccount && (
+            <div style={{ ...S.card, padding: 16, fontSize: 13 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8, color: "#555" }}>匯款帳戶</div>
+              <div style={{ color: "#666", lineHeight: 1.8 }}>
+                {bankAccount.bankName} {bankAccount.branchName}（{bankAccount.bankCode}）<br />
+                戶名：{bankAccount.accountName}<br />
+                帳號：{bankAccount.accountNumber}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 列表頁
+  return (
+    <div style={{ fontFamily: bodyFont, background: "#f7f7f5", minHeight: "100vh" }}>
+      {/* 頂部 */}
+      <div style={{ background: "#fff", borderBottom: "1px solid #e8e8e8", padding: "14px 16px", position: "sticky", top: 0, zIndex: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+          <div style={{ fontWeight: 700, fontSize: 17, flex: 1 }}>報價單</div>
+          <div style={{ fontSize: 12, color: "#aaa" }}>何為設計</div>
+        </div>
+        <input
+          style={{ ...S.input, fontSize: 14 }}
+          placeholder="搜尋案件名稱、客戶…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* 列表 */}
+      <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: "center", padding: 40, color: "#bbb", fontSize: 14 }}>沒有符合的報價單</div>
+        ) : filtered.map(q => {
+          const items = allItems.filter(it => it.quoteId === q.id).map(calcItem);
+          const sum = calcQuoteSummary(items, q);
+          return (
+            <div
+              key={q.id}
+              onClick={() => { setSelectedId(q.id); setView("detail"); }}
+              style={{
+                background: "#fff",
+                border: "1px solid #e8e8e8",
+                borderRadius: 8,
+                padding: "14px 16px",
+                cursor: "pointer",
+                borderLeft: `4px solid ${STATUS_BG[q.status] === "#f5f5f5" ? "#ccc" : "#6aaa8a"}`,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                <div style={{ fontWeight: 600, fontSize: 15, flex: 1, marginRight: 8 }}>{q.name}</div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "#4a8fa8", whiteSpace: "nowrap" }}>
+                  {sum.total > 0 ? `$${fmt(sum.total)}` : "—"}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, fontSize: 12, color: "#888" }}>
+                {q.clientName && <span>{q.clientName}</span>}
+                {q.date && <span>· {q.date}</span>}
+                <span style={{
+                  marginLeft: "auto",
+                  background: STATUS_BG[q.status] || "#f5f5f5",
+                  padding: "2px 8px", borderRadius: 10, fontSize: 11,
+                }}>
+                  {STATUS_LABELS[q.status]}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 底部提示 */}
+      <div style={{ textAlign: "center", padding: "20px 16px", color: "#ccc", fontSize: 12 }}>
+        手機版為唯讀模式，編輯請使用電腦或 iPad
+      </div>
     </div>
   );
 }
