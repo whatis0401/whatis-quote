@@ -3079,12 +3079,37 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
   const [searching, setSearching] = useState(false);
   const [showTagMenu, setShowTagMenu] = useState(false);
   const [memoText, setMemoText] = useState(item.tagMemo || "");
+  const tagMenuRef = useRef(null);
+  const priceRefEl = useRef(null);
 
   const currentTag = ITEM_TAGS.find(t => t.id === item.tag);
 
+  // 點擊外部關閉標籤選單
+  useEffect(() => {
+    if (!showTagMenu) return;
+    function handleOutside(e) {
+      if (tagMenuRef.current && !tagMenuRef.current.contains(e.target)) {
+        setShowTagMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [showTagMenu]);
+
+  // 點擊外部關閉行情下拉
+  useEffect(() => {
+    if (!priceRef) return;
+    function handleOutside(e) {
+      if (priceRefEl.current && !priceRefEl.current.contains(e.target)) {
+        setPriceRef(null);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [priceRef]);
+
   function handleTagSelect(tagId) {
     if (tagId === item.tag) {
-      // 點相同標籤 → 移除
       onUpdate({ tag: null, tagMemo: null });
     } else {
       onUpdate({ tag: tagId, tagMemo: tagId === "memo" ? memoText : null });
@@ -3188,7 +3213,7 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
         />
         {searching && <span style={{ position: "absolute", right: 4, top: 4, fontSize: 10, color: "#aaa" }}>搜尋中…</span>}
         {priceRef && priceRef.length > 0 && (
-          <div style={{
+          <div ref={priceRefEl} style={{
             position: "absolute", left: 0, top: "100%", zIndex: 50,
             background: "#fff", border: "1px solid #e0e0e0", borderRadius: 4,
             boxShadow: "0 4px 12px rgba(0,0,0,0.1)", minWidth: 320,
@@ -3312,13 +3337,11 @@ function ItemRow({ item, index, showPosition, colWidths, onUpdate, onRemove, onM
 
         {/* 標籤選單 */}
         {showTagMenu && (
-          <div style={{
+          <div ref={tagMenuRef} style={{
             position: "absolute", right: 40, top: 0, zIndex: 100,
             background: "#fff", border: "1px solid #e0e0e0", borderRadius: 6,
             boxShadow: "0 4px 16px rgba(0,0,0,0.12)", padding: 10, minWidth: 160,
-          }}
-            onMouseLeave={() => setShowTagMenu(false)}
-          >
+          }}>
             <div style={{ fontSize: 11, color: "#aaa", marginBottom: 8 }}>選擇標籤</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {ITEM_TAGS.filter(t => t.id !== "memo").map(t => (
