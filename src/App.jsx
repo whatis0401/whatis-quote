@@ -1318,7 +1318,7 @@ function QuoteRow({ q, allItems, settings, sortedProjects, showProjectMenu, setS
     <div
       style={{
         ...S.card, padding: "14px 20px", borderRadius: 4,
-        display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 100px",
+        display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 140px",
         alignItems: "center", gap: 8, cursor: "pointer", transition: "border-color 0.15s", marginBottom: 1,
       }}
       onMouseEnter={e => e.currentTarget.style.borderColor = "#ccc"}
@@ -1390,7 +1390,7 @@ function QuoteRow({ q, allItems, settings, sortedProjects, showProjectMenu, setS
             exportQuoteExcel(q, qItems, settings);
           }}
           title="匯出 Excel"
-        >📊</button>
+        >匯出</button>
         <button style={{ ...S.btnDanger, padding: "4px 8px", fontSize: 11 }}
           onClick={e => { e.stopPropagation(); onDelete(q.id); }}>刪除</button>
       </div>
@@ -1477,7 +1477,7 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
   const tableHeader = (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 100px",
+      gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 140px",
       padding: "8px 20px", fontSize: 11, color: "#aaa", fontWeight: 600, letterSpacing: 0.5,
     }}>
       <div>報價單名稱</div><div>客戶</div><div>日期</div>
