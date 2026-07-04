@@ -3,6 +3,7 @@
 // ============================================================
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import XLSXStyle from "xlsx-js-style";
 
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzSpPwVWdJkzvuPG6HM0fOBFJv271mEuPCF5V2AyD9iaMp5gRfV8CPDnv-HmBH7FKKOYg/exec";
 
@@ -300,6 +301,252 @@ const TYPE_LABELS = {
 };
 
 // ─── 樣式常數 ───────────────────────────────────────────────
+// ─── Excel 匯出 ──────────────────────────────────────────────
+function exportQuoteExcel(quote, items, settings) {
+  const wb = XLSXStyle.utils.book_new();
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+
+  // 字體與樣式
+  const _F = (sz = 10, bold = false, color = "333333") => ({
+    name: "微軟正黑體", sz, bold, color: { rgb: color }
+  });
+  const _FB = (sz = 10, color = "FFFFFF") => _F(sz, true, color);
+
+  const ST = {
+    sectionTitle: {
+      font: _FB(11, "FFFFFF"),
+      fill: { fgColor: { rgb: "4A4A4A" } },
+      alignment: { horizontal: "left", vertical: "center" },
+      border: { bottom: { style: "thin", color: { rgb: "CCCCCC" } } }
+    },
+    colHeader: {
+      font: _FB(10, "333333"),
+      fill: { fgColor: { rgb: "E8E8E8" } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: { bottom: { style: "thin", color: { rgb: "CCCCCC" } } }
+    },
+    colHeaderR: {
+      font: _FB(10, "333333"),
+      fill: { fgColor: { rgb: "E8E8E8" } },
+      alignment: { horizontal: "right", vertical: "center" },
+    },
+    dataWhite: { font: _F(10), fill: { fgColor: { rgb: "FFFFFF" } } },
+    dataGray:  { font: _F(10), fill: { fgColor: { rgb: "F8F8F8" } } },
+    total:     { font: _FB(10, "333333"), fill: { fgColor: { rgb: "F0F0F0" } } },
+    totalR:    { font: _FB(10, "333333"), fill: { fgColor: { rgb: "F0F0F0" } }, alignment: { horizontal: "right" }, numFmt: "#,##0" },
+    section:   { font: _FB(11, "555555"), fill: { fgColor: { rgb: "F0F0EE" } }, alignment: { horizontal: "left" } },
+    profitPos: { font: _FB(10, "2D7A2D"), fill: { fgColor: { rgb: "F0F8F4" } }, alignment: { horizontal: "right" }, numFmt: "#,##0" },
+    profitNeg: { font: _FB(10, "C0675A"), fill: { fgColor: { rgb: "FDF0EE" } }, alignment: { horizontal: "right" }, numFmt: "#,##0" },
+    numR:      { font: _F(10), alignment: { horizontal: "right" }, numFmt: "#,##0" },
+    numC:      { font: _F(10), alignment: { horizontal: "center" } },
+  };
+
+  function c(v, s, z) {
+    const cell = typeof v === "number" ? { t: "n", v } : { t: "s", v: String(v ?? "") };
+    if (s) cell.s = s;
+    if (z) cell.z = z;
+    return cell;
+  }
+
+  function setColWidths(ws, widths) {
+    ws["!cols"] = widths.map(w => ({ wch: w }));
+  }
+
+  function safeSheetName(wb, name) {
+    let safe = (name || "工作表").replace(/[\\\/\?\*\[\]:]/g, "_").substring(0, 28);
+    let final = safe; let n = 1;
+    while (wb.SheetNames.includes(final)) final = safe.substring(0, 25) + "_" + n++;
+    return final;
+  }
+
+  const calcedItems = items.map(calcItem);
+  const summary = calcQuoteSummary(calcedItems, quote);
+  const clientItems = calcedItems.filter(it => it.unit !== "__section__");
+  const groups = settings.engineering_groups || [];
+  const categories = settings.engineering_categories || [];
+  const isIntegrated = quote.type === "integrated";
+
+  // ── 工作表一：客戶版報價 ──────────────────────────────────
+  function buildClientSheet() {
+    const aoa = [];
+    // 基本資訊
+    aoa.push(["工程報價單"]);
+    aoa.push(["工程名稱", quote.projectName || quote.name]);
+    aoa.push(["工程地址", quote.projectAddress || ""]);
+    aoa.push(["業主", quote.clientName || ""]);
+    aoa.push(["日期", quote.date || ""]);
+    aoa.push([]);
+
+    if (isIntegrated) {
+      // 整合式：先總表再明細
+      const sortedGroups = [...groups].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      aoa.push(["項目", "工程大項", "", "", "金額", "備註"]);
+
+      let alphaIdx = 0;
+      const alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      sortedGroups.forEach(g => {
+        const gItems = clientItems.filter(it => it.group === g.id);
+        if (!gItems.length) return;
+        const catIds = [...new Set(gItems.map(it => it.category))].sort((a, b) => {
+          const ca = categories.find(c => c.id === a);
+          const cb = categories.find(c => c.id === b);
+          return (ca?.sortOrder || 999) - (cb?.sortOrder || 999);
+        });
+        catIds.forEach(catId => {
+          const cat = categories.find(c2 => c2.id === catId);
+          const catTotal = gItems.filter(it => it.category === catId).reduce((s, it) => s + it.total, 0);
+          aoa.push([alpha[alphaIdx++ % 26], cat?.name || "其他", "", "", catTotal, ""]);
+        });
+      });
+      aoa.push([]);
+      aoa.push(["", "", "", "", summary.subtotal, ""]);
+      if (summary.managementFee > 0) aoa.push(["", `工程管理費(${quote.managementFeeValue}%)`, "", "", summary.managementFee, ""]);
+      aoa.push([]);
+      if (quote.taxRate > 0) {
+        aoa.push(["", "", "", "", "未稅", summary.beforeTax]);
+        aoa.push(["", "", "", "", "稅金", summary.taxAmount]);
+      }
+      aoa.push(["", "", "", "", quote.taxRate > 0 ? "總價" : "工程承攬總價", summary.total]);
+
+      aoa.push([]);
+      aoa.push([]);
+      aoa.push(["品項明細"]);
+
+      sortedGroups.forEach(g => {
+        const gItems = calcedItems.filter(it => it.group === g.id);
+        if (!gItems.length) return;
+        aoa.push([g.name]);
+        const catIds = [...new Set(gItems.map(it => it.category))].sort((a, b) => {
+          const ca = categories.find(c => c.id === a);
+          const cb = categories.find(c => c.id === b);
+          return (ca?.sortOrder || 999) - (cb?.sortOrder || 999);
+        });
+        catIds.forEach(catId => {
+          const cat = categories.find(c2 => c2.id === catId);
+          const catItems2 = gItems.filter(it => it.category === catId);
+          aoa.push([cat?.name || "其他"]);
+          aoa.push(["#", "工程細項", "單位", "數量", "單價", "金額", "備註"]);
+          let rowIdx = 0;
+          catItems2.forEach(it => {
+            if (it.unit === "__section__") { aoa.push(["", it.itemName]); return; }
+            rowIdx++;
+            aoa.push([rowIdx, it.itemName, it.unit, it.qty, it.price, it.total, it.note || ""]);
+          });
+          const catTotal = catItems2.filter(it => it.unit !== "__section__").reduce((s, it) => s + it.total, 0);
+          aoa.push(["", "", "", "", "小計", catTotal, ""]);
+          aoa.push([]);
+        });
+      });
+    } else {
+      // 獨立品項
+      aoa.push(["#", "位置", "工程細項", "單位", "數量", "單價", "金額", "備註"]);
+      let idx = 0;
+      calcedItems.forEach(it => {
+        if (it.unit === "__section__") { aoa.push(["", "", it.itemName]); return; }
+        idx++;
+        aoa.push([idx, it.position || "", it.itemName, it.unit, it.qty, it.price, it.total, it.note || ""]);
+      });
+      aoa.push([]);
+      aoa.push(["", "", "", "", "", "小計", summary.subtotal, ""]);
+      if (summary.managementFee > 0) aoa.push(["", "", "", "", "", `管理費(${quote.managementFeeValue}%)`, summary.managementFee, ""]);
+      if (quote.taxRate > 0) {
+        aoa.push(["", "", "", "", "", "未稅", summary.beforeTax, ""]);
+        aoa.push(["", "", "", "", "", "稅金", summary.taxAmount, ""]);
+      }
+      aoa.push(["", "", "", "", "", quote.taxRate > 0 ? "總價" : "工程承攬總價", summary.total, ""]);
+    }
+
+    const ws = XLSXStyle.utils.aoa_to_sheet(aoa);
+    setColWidths(ws, isIntegrated ? [6, 20, 10, 10, 14, 16] : [6, 12, 20, 8, 8, 12, 14, 16]);
+    return ws;
+  }
+
+  // ── 工作表二：內部成本分析 ───────────────────────────────
+  function buildInternalSheet() {
+    const totalCost = clientItems.reduce((s, it) => s + toNum(it.cost) * toNum(it.qty), 0);
+    const totalRevenue = clientItems.reduce((s, it) => s + it.total, 0);
+    const totalProfit = totalRevenue - totalCost;
+    const marginPct = totalRevenue > 0 ? Math.round((totalProfit / totalRevenue) * 100) : 0;
+
+    const aoa = [];
+    aoa.push(["INTERNAL USE ONLY — 成本利潤分析表"]);
+    aoa.push(["工程名稱", quote.projectName || quote.name]);
+    aoa.push(["業主", quote.clientName || ""]);
+    aoa.push(["日期", quote.date || ""]);
+    aoa.push([]);
+    aoa.push(["報價合計（未稅）", summary.subtotal, "成本合計", totalCost, "毛利", totalProfit, "毛利率", `${marginPct}%`]);
+    aoa.push([]);
+    aoa.push(["#", "品項", "單位", "數量", "成本單價", "倍率", "報價單價", "成本小計", "毛利", "毛利率"]);
+
+    let idx = 0;
+
+    function pushItemRow(it, i) {
+      const costTotal = Math.round(toNum(it.cost) * toNum(it.qty));
+      const profit = it.total - costTotal;
+      const pct = it.total > 0 ? Math.round((profit / it.total) * 100) : 0;
+      aoa.push([
+        i, it.itemName, it.unit, it.qty,
+        it.cost || 0, it.multiplier || "",
+        it.price, costTotal,
+        profit, `${pct}%`
+      ]);
+    }
+
+    if (isIntegrated) {
+      const sortedGroups = [...groups].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      sortedGroups.forEach(g => {
+        const gItems = calcedItems.filter(it => it.group === g.id);
+        if (!gItems.length) return;
+        aoa.push([g.name]);
+        const catIds = [...new Set(gItems.map(it => it.category))].sort((a, b) => {
+          const ca = categories.find(c => c.id === a);
+          const cb = categories.find(c => c.id === b);
+          return (ca?.sortOrder || 999) - (cb?.sortOrder || 999);
+        });
+        catIds.forEach(catId => {
+          const cat = categories.find(c2 => c2.id === catId);
+          const catItems2 = gItems.filter(it => it.category === catId);
+          aoa.push([cat?.name || "其他"]);
+          catItems2.forEach(it => {
+            if (it.unit === "__section__") { aoa.push(["", it.itemName]); return; }
+            idx++;
+            pushItemRow(it, idx);
+          });
+        });
+      });
+    } else {
+      calcedItems.forEach(it => {
+        if (it.unit === "__section__") { aoa.push(["", it.itemName]); return; }
+        idx++;
+        pushItemRow(it, idx);
+      });
+    }
+
+    aoa.push([]);
+    aoa.push(["合計", "", "", "", "", "", summary.subtotal, totalCost, totalProfit, `${marginPct}%`]);
+    if (summary.managementFee > 0) {
+      aoa.push([`管理費(${quote.managementFeeValue}%)`, "", "", "", "", "", summary.managementFee]);
+    }
+    if (quote.taxRate > 0) {
+      aoa.push(["稅金", "", "", "", "", "", summary.taxAmount]);
+    }
+    aoa.push(["總價", "", "", "", "", "", summary.total]);
+
+    const ws = XLSXStyle.utils.aoa_to_sheet(aoa);
+    setColWidths(ws, [6, 22, 8, 8, 12, 8, 12, 12, 12, 10]);
+    return ws;
+  }
+
+  const clientWs = buildClientSheet();
+  const internalWs = buildInternalSheet();
+
+  XLSXStyle.utils.book_append_sheet(wb, clientWs, safeSheetName(wb, "客戶版報價"));
+  XLSXStyle.utils.book_append_sheet(wb, internalWs, safeSheetName(wb, "內部成本分析"));
+
+  const fileName = `何為設計_${(quote.projectName || quote.name).replace(/[\\\/\?\*\[\]:]/g, "_").substring(0, 20)}_${today}.xlsx`;
+  XLSXStyle.writeFile(wb, fileName);
+}
+
 const S = {
   page: {
     fontFamily: '"微軟正黑體","Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif',
@@ -1135,6 +1382,15 @@ function QuoteRow({ q, allItems, sortedProjects, showProjectMenu, setShowProject
         </div>
         <button style={{ ...S.btnSecondary, padding: "4px 8px", fontSize: 11 }}
           onClick={e => { e.stopPropagation(); onDuplicate(q.id); }}>複製</button>
+        <button
+          style={{ ...S.btnSecondary, padding: "4px 8px", fontSize: 11 }}
+          onClick={e => {
+            e.stopPropagation();
+            const qItems = allItems.filter(it => it.quoteId === q.id);
+            exportQuoteExcel(q, qItems, settings);
+          }}
+          title="匯出 Excel"
+        >📊</button>
         <button style={{ ...S.btnDanger, padding: "4px 8px", fontSize: 11 }}
           onClick={e => { e.stopPropagation(); onDelete(q.id); }}>刪除</button>
       </div>
