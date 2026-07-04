@@ -1311,7 +1311,7 @@ function Sidebar({ page, setPage }) {
 }
 
 // ─── 報價單列（獨立元件）────────────────────────────────────
-function QuoteRow({ q, allItems, sortedProjects, showProjectMenu, setShowProjectMenu, onEdit, onStatusChange, onMoveToProject, onDuplicate, onDelete }) {
+function QuoteRow({ q, allItems, settings, sortedProjects, showProjectMenu, setShowProjectMenu, onEdit, onStatusChange, onMoveToProject, onDuplicate, onDelete }) {
   const items = allItems.filter(it => it.quoteId === q.id).map(calcItem);
   const summary = calcQuoteSummary(items, q);
   return (
@@ -1570,7 +1570,7 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
             ? <div style={{ ...S.card, textAlign: "center", padding: 48, color: "#bbb" }}>沒有符合條件的報價單</div>
             : filtered.map(q => (
                 <QuoteRow key={q.id} q={q}
-                  allItems={allItems} sortedProjects={sortedProjects}
+                  allItems={allItems} settings={settings} sortedProjects={sortedProjects}
                   showProjectMenu={showProjectMenu} setShowProjectMenu={setShowProjectMenu}
                   onEdit={onEdit} onStatusChange={onStatusChange} onMoveToProject={onMoveToProject}
                   onDuplicate={onDuplicate} onDelete={onDelete}
@@ -1635,7 +1635,7 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
                           {tableHeader}
                           {pQuotes.map(q => (
                             <QuoteRow key={q.id} q={q}
-                              allItems={allItems} sortedProjects={sortedProjects}
+                              allItems={allItems} settings={settings} sortedProjects={sortedProjects}
                               showProjectMenu={showProjectMenu} setShowProjectMenu={setShowProjectMenu}
                               onEdit={onEdit} onStatusChange={onStatusChange} onMoveToProject={onMoveToProject}
                               onDuplicate={onDuplicate} onDelete={onDelete}
@@ -1674,7 +1674,7 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
                     {tableHeader}
                     {uncategorized.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(q => (
                       <QuoteRow key={q.id} q={q}
-                        allItems={allItems} sortedProjects={sortedProjects}
+                        allItems={allItems} settings={settings} sortedProjects={sortedProjects}
                         showProjectMenu={showProjectMenu} setShowProjectMenu={setShowProjectMenu}
                         onEdit={onEdit} onStatusChange={onStatusChange} onMoveToProject={onMoveToProject}
                         onDuplicate={onDuplicate} onDelete={onDelete}
