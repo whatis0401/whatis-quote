@@ -3726,6 +3726,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
     signatureHeight: 100,
     signatureMarginTop: 35,
     totalColor: "#c0522a",
+    printMargin: 10,
   };
   const [showAdjust, setShowAdjust] = useState(false);
   const [adj, setAdj] = useState(() => {
@@ -3766,7 +3767,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
         .print-card:last-child { page-break-after: avoid !important; break-after: avoid !important; }
         tfoot { display: table-row-group !important; }
         .print-wrap { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; }
-        @page { margin: 10mm; size: A4 portrait; }
+        @page { margin: ${adj.printMargin ?? 10}mm; size: A4 portrait; }
       }
     `;
     document.head.appendChild(style);
@@ -3854,8 +3855,14 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
   // 整合式第一頁：總表
   function SummaryPage() {
-    const label = { padding: "6px 10px", fontSize: 13, borderBottom: "1px solid #eee", fontFamily: bodyFont };
-    const amount = { padding: "6px 10px", textAlign: "right", fontSize: 13, borderBottom: "1px solid #eee", fontFamily: bodyFont };
+    // 計算總大項數，超過 12 個自動縮小
+    const totalCatCount = integratedData.reduce((s, gd) => s + gd.cats.length, 0);
+    const isCompact = totalCatCount > 12;
+    const baseFontSize = isCompact ? 11 : 13;
+    const basePadding = isCompact ? "4px 8px" : "6px 10px";
+
+    const label = { padding: basePadding, fontSize: baseFontSize, borderBottom: "1px solid #eee", fontFamily: bodyFont };
+    const amount = { padding: basePadding, textAlign: "right", fontSize: baseFontSize, borderBottom: "1px solid #eee", fontFamily: bodyFont };
     const letters = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];
 
     return (
@@ -4321,6 +4328,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
             { key: "footerTitleFontSize", label: "底部標題字體大小", min: 10, max: 18, unit: "px" },
             { key: "signatureHeight", label: "簽章框高度", min: 40, max: 150, unit: "px" },
             { key: "signatureMarginTop", label: "簽章區上方間距", min: 0, max: 60, unit: "px" },
+            { key: "printMargin", label: "列印頁面邊距", min: 3, max: 20, unit: "mm" },
           ].map(({ key, label, min, max, unit }) => (
             <div key={key} style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
