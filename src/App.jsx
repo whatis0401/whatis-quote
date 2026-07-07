@@ -3909,39 +3909,45 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
               });
             })()}
 
-            {/* 工程項目合計 */}
-            <tr style={{ background: "#f5f5f5", fontWeight: 600 }}>
-              <td colSpan={2} style={{ ...label, textAlign: "right", borderTop: "1px solid #ccc" }}>工程項目合計</td>
-              <td style={{ ...amount, borderTop: "1px solid #ccc" }}>${fmt(summary.subtotal)}</td>
-              <td style={{ ...label, borderTop: "1px solid #ccc" }}></td>
+            {/* 工程項目合計 + 管理費區：不分頁 */}
+            <tr>
+              <td colSpan={4} style={{ padding: 0, border: "none" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", pageBreakInside: "avoid" }}>
+                  <tbody>
+                    <tr style={{ background: "#f5f5f5", fontWeight: 600 }}>
+                      <td colSpan={2} style={{ ...label, textAlign: "right", borderTop: "1px solid #ccc", width: "calc(100% - 260px)" }}>工程項目合計</td>
+                      <td style={{ ...amount, borderTop: "1px solid #ccc", width: 140 }}>${fmt(summary.subtotal)}</td>
+                      <td style={{ ...label, borderTop: "1px solid #ccc", width: 120 }}></td>
+                    </tr>
+                    {quote.managementFeeMode !== "none" && (
+                      <tr>
+                        <td colSpan={4} style={{ padding: 0, height: 12, borderBottom: "none" }}></td>
+                      </tr>
+                    )}
+                    {quote.managementFeeMode !== "none" && (
+                      <tr>
+                        <td style={{ ...label, textAlign: "center", color: "#888" }}></td>
+                        <td style={label}>
+                          工程管理費({quote.managementFeeValue}{quote.managementFeeMode === "percent" ? "%" : ""})
+                          {summary.managementFeeDiscount > 0 && <span style={{ color: "#888" }}>（折扣）</span>}
+                        </td>
+                        <td style={amount}>
+                          {summary.managementFeeDiscount > 0 ? (
+                            <span>
+                              <span style={{ textDecoration: "line-through", color: "#aaa", marginRight: 8 }}>
+                                ${fmt(summary.managementFeeRaw)}
+                              </span>
+                              ${fmt(summary.managementFee)}
+                            </span>
+                          ) : `$${fmt(summary.managementFee)}`}
+                        </td>
+                        <td style={label}></td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </td>
             </tr>
-
-            {/* 工程管理費：合計下方，有間距 */}
-            {quote.managementFeeMode !== "none" && (
-              <tr>
-                <td colSpan={4} style={{ padding: 0, height: 12, borderBottom: "none" }}></td>
-              </tr>
-            )}
-            {quote.managementFeeMode !== "none" && (
-              <tr>
-                <td style={{ ...label, textAlign: "center", color: "#888" }}></td>
-                <td style={label}>
-                  工程管理費({quote.managementFeeValue}{quote.managementFeeMode === "percent" ? "%" : ""})
-                  {summary.managementFeeDiscount > 0 && <span style={{ color: "#888" }}>（折扣）</span>}
-                </td>
-                <td style={amount}>
-                  {summary.managementFeeDiscount > 0 ? (
-                    <span>
-                      <span style={{ textDecoration: "line-through", color: "#aaa", marginRight: 8 }}>
-                        ${fmt(summary.managementFeeRaw)}
-                      </span>
-                      ${fmt(summary.managementFee)}
-                    </span>
-                  ) : `$${fmt(summary.managementFee)}`}
-                </td>
-                <td style={label}></td>
-              </tr>
-            )}
           </tbody>
         </table>
 
