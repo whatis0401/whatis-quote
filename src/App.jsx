@@ -3763,6 +3763,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
         .print-content { margin-top: 0 !important; background: #fff !important; padding: 0 !important; }
         .print-card { width: 100% !important; max-width: 100% !important; margin: 0 !important; padding: 20px !important; box-shadow: none !important; background: #fff !important; box-sizing: border-box !important; }
         .print-card-break { page-break-after: always !important; break-after: page !important; }
+        .print-card:last-child { page-break-after: avoid !important; break-after: avoid !important; }
         tfoot { display: table-row-group !important; }
         .print-wrap { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; }
         @page { margin: 10mm; size: A4 portrait; }
@@ -3877,28 +3878,29 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
             {(() => {
               let globalIdx = 0;
               return integratedData.map((gd, gi) => {
-                const catRows = gd.cats.map((cd, ci) => (
-                  <tr key={`${gi}-${ci}`}>
-                    <td style={{ ...label, textAlign: "center", color: "#888" }}>{letters[globalIdx++]}</td>
-                    <td style={label}>{cd.cat ? cd.cat.name : "其他"}</td>
-                    <td style={amount}>${fmt(cd.catTotal)}</td>
-                    <td style={label}></td>
-                  </tr>
-                ));
-                return (
-                  <React.Fragment key={gi}>
-                    {catRows}
-                    {gd.cats.length > 1 && (
-                      <tr key={`g${gi}-total`} style={{ background: "#fafafa" }}>
-                        <td colSpan={2} style={{ ...label, paddingLeft: 20, color: "#888", fontWeight: 600 }}>
-                          {gd.group.name}小計
-                        </td>
-                        <td style={{ ...amount, fontWeight: 600 }}>${fmt(gd.gTotal)}</td>
-                        <td style={label}></td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
+                const rows = [];
+                gd.cats.forEach((cd, ci) => {
+                  rows.push(
+                    <tr key={`cat-${gi}-${ci}`}>
+                      <td style={{ ...label, textAlign: "center", color: "#888" }}>{letters[globalIdx++]}</td>
+                      <td style={label}>{cd.cat ? cd.cat.name : "其他"}</td>
+                      <td style={amount}>${fmt(cd.catTotal)}</td>
+                      <td style={label}></td>
+                    </tr>
+                  );
+                });
+                if (gd.cats.length > 1) {
+                  rows.push(
+                    <tr key={`g${gi}-total`} style={{ background: "#fafafa" }}>
+                      <td colSpan={2} style={{ ...label, paddingLeft: 20, color: "#888", fontWeight: 600 }}>
+                        {gd.group.name}小計
+                      </td>
+                      <td style={{ ...amount, fontWeight: 600 }}>${fmt(gd.gTotal)}</td>
+                      <td style={label}></td>
+                    </tr>
+                  );
+                }
+                return rows;
               });
             })()}
 
@@ -4257,7 +4259,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
         </div>
 
         {/* 封底頁尾 */}
-        <div style={{ marginTop: 40, borderTop: "1px solid #ccc", paddingTop: 10, display: "flex", justifyContent: "flex-end", gap: 24, fontFamily: bodyFont }}>
+        <div style={{ marginTop: 24, borderTop: "1px solid #ccc", paddingTop: 8, display: "flex", justifyContent: "flex-end", gap: 24, fontFamily: bodyFont }}>
           <span style={{ fontSize: 11, color: "#aaa", letterSpacing: 0.5 }}>www.whatisarchdesign.com</span>
           <span style={{ fontSize: 11, color: "#aaa", letterSpacing: 0.5 }}>LINE：@whatis</span>
         </div>
