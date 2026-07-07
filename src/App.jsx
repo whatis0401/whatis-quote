@@ -3875,10 +3875,10 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
         <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20 }}>
           <thead>
             <tr style={{ background: "#f5f5f5", fontSize: 12, color: "#666" }}>
-              <th style={{ ...label, width: 50, textAlign: "center" }}>項目</th>
-              <th style={label}>工程項目</th>
-              <th style={{ ...amount, width: 140 }}>金額</th>
-              <th style={{ ...label, width: 120 }}>備註</th>
+              <th style={{ ...label, width: 40, textAlign: "center" }}>項目</th>
+              <th style={{ ...label, paddingLeft: 8 }}>工程項目</th>
+              <th style={{ ...amount, width: 130 }}>金額</th>
+              <th style={{ ...label, width: 80 }}>備註</th>
             </tr>
           </thead>
           <tbody>
@@ -3892,10 +3892,11 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                     <td colSpan={4} style={{
                       ...label,
                       fontWeight: 600,
-                      fontSize: 12,
+                      fontSize: isCompact ? 10 : 11,
                       color: "#888",
                       paddingTop: gi === 0 ? 6 : 14,
                       paddingBottom: 4,
+                      paddingLeft: 8,
                       borderBottom: "none",
                       letterSpacing: 1,
                     }}>{gd.group.name}</td>
@@ -3905,8 +3906,8 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                 gd.cats.forEach((cd, ci) => {
                   rows.push(
                     <tr key={`cat-${gi}-${ci}`}>
-                      <td style={{ ...label, textAlign: "center", color: "#888", paddingLeft: 20 }}>{letters[globalIdx++]}</td>
-                      <td style={{ ...label, paddingLeft: 16 }}>{cd.cat ? cd.cat.name : "其他"}</td>
+                      <td style={{ ...label, textAlign: "center", color: "#888" }}>{letters[globalIdx++]}</td>
+                      <td style={{ ...label, paddingLeft: 8 }}>{cd.cat ? cd.cat.name : "其他"}</td>
                       <td style={amount}>${fmt(cd.catTotal)}</td>
                       <td style={label}></td>
                     </tr>
