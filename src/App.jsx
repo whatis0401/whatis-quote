@@ -4325,8 +4325,8 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
             { key: "signatureHeight", label: "簽章框高度", min: 40, max: 150, unit: "px" },
             { key: "signatureMarginTop", label: "簽章區上方間距", min: 0, max: 60, unit: "px" },
             { key: "printMargin", label: "列印頁面邊距", min: 3, max: 20, unit: "mm" },
-            { key: "summaryColItem", label: "總表項目欄寬", min: 5, max: 20, unit: "%" },
-            { key: "summaryColName", label: "總表工程項目欄寬", min: 40, max: 80, unit: "%" },
+            { key: "summaryColItem", label: "總表：項目欄寬", min: 5, max: 25, unit: "%" },
+            { key: "summaryColName", label: "總表：工程項目欄寬", min: 30, max: 80, unit: "%" },
           ].map(({ key, label, min, max, unit }) => (
             <div key={key} style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
@@ -4340,6 +4340,16 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
               />
             </div>
           ))}
+
+          {/* 總表金額欄（自動計算） */}
+          <div style={{ marginBottom: 14, padding: "8px 12px", background: "#f9f9f9", borderRadius: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 11, color: "#aaa" }}>總表：金額欄寬（自動）</span>
+              <span style={{ fontSize: 11, fontWeight: 600, color: "#888" }}>
+                {100 - (adj.summaryColItem || 12) - (adj.summaryColName || 68)}%
+              </span>
+            </div>
+          </div>
 
           {/* 顏色選擇 */}
           <div style={{ marginBottom: 14, borderTop: "1px solid #f0f0f0", paddingTop: 14 }}>
