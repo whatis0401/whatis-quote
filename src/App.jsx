@@ -3872,13 +3872,19 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
           工 程 估 價 總 表
         </div>
 
-        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20, tableLayout: "fixed" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20 }}>
+          <colgroup>
+            <col style={{ width: "8%" }} />
+            <col style={{ width: "60%" }} />
+            <col style={{ width: "22%" }} />
+            <col style={{ width: "10%" }} />
+          </colgroup>
           <thead>
             <tr style={{ background: "#f5f5f5", fontSize: 12, color: "#666" }}>
-              <th style={{ ...label, width: 40, textAlign: "center" }}>項目</th>
-              <th style={{ ...label, paddingLeft: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>工程項目</th>
-              <th style={{ ...amount, width: 130 }}>金額</th>
-              <th style={{ ...label, width: 80 }}>備註</th>
+              <th style={{ ...label, textAlign: "center" }}>項目</th>
+              <th style={{ ...label, textAlign: "left" }}>工程項目</th>
+              <th style={{ ...amount }}>金額</th>
+              <th style={{ ...label }}>備註</th>
             </tr>
           </thead>
           <tbody>
@@ -3907,9 +3913,9 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                   rows.push(
                     <tr key={`cat-${gi}-${ci}`}>
                       <td style={{ ...label, textAlign: "center", color: "#888" }}>{letters[globalIdx++]}</td>
-                      <td style={{ ...label, paddingLeft: 8 }}>{cd.cat ? cd.cat.name : "其他"}</td>
-                      <td style={amount}>${fmt(cd.catTotal)}</td>
-                      <td style={label}></td>
+                      <td style={{ ...label, textAlign: "left" }}>{cd.cat ? cd.cat.name : "其他"}</td>
+                      <td style={{ ...amount }}>${fmt(cd.catTotal)}</td>
+                      <td style={{ ...label }}></td>
                     </tr>
                   );
                 });
