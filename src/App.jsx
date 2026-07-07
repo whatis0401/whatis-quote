@@ -1133,7 +1133,7 @@ function MobileView({ quotes, allItems, projects, settings }) {
               {selectedQuote.taxRate > 0 && (
                 <>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span style={{ color: "#888" }}>未稅</span>
+                    <span style={{ color: "#888" }}>工程承攬未稅金額</span>
                     <span>${fmt(summary.beforeTax)}</span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -3874,33 +3874,33 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
             </tr>
           </thead>
           <tbody>
-            {integratedData.map((gd, gi) => {
-              const catRows = [];
-              gd.cats.forEach((cd, ci) => {
-                catRows.push(
+            {(() => {
+              let globalIdx = 0;
+              return integratedData.map((gd, gi) => {
+                const catRows = gd.cats.map((cd, ci) => (
                   <tr key={`${gi}-${ci}`}>
-                    <td style={{ ...label, textAlign: "center", color: "#888" }}>{letters[catRows.length + gi]}</td>
+                    <td style={{ ...label, textAlign: "center", color: "#888" }}>{letters[globalIdx++]}</td>
                     <td style={label}>{cd.cat ? cd.cat.name : "其他"}</td>
                     <td style={amount}>${fmt(cd.catTotal)}</td>
                     <td style={label}></td>
                   </tr>
+                ));
+                return (
+                  <React.Fragment key={gi}>
+                    {catRows}
+                    {gd.cats.length > 1 && (
+                      <tr key={`g${gi}-total`} style={{ background: "#fafafa" }}>
+                        <td colSpan={2} style={{ ...label, paddingLeft: 20, color: "#888", fontWeight: 600 }}>
+                          {gd.group.name}小計
+                        </td>
+                        <td style={{ ...amount, fontWeight: 600 }}>${fmt(gd.gTotal)}</td>
+                        <td style={label}></td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               });
-              return (
-                <>
-                  {catRows}
-                  {gd.cats.length > 1 && (
-                    <tr key={`g${gi}-total`} style={{ background: "#fafafa" }}>
-                      <td colSpan={2} style={{ ...label, paddingLeft: 20, color: "#888", fontWeight: 600 }}>
-                        {gd.group.name}小計
-                      </td>
-                      <td style={{ ...amount, fontWeight: 600 }}>${fmt(gd.gTotal)}</td>
-                      <td style={label}></td>
-                    </tr>
-                  )}
-                </>
-              );
-            })}
+            })()}
 
             {/* 工程管理費 */}
             {quote.managementFeeMode !== "none" && (
@@ -3948,7 +3948,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
               {quote.taxRate > 0 ? (
                 <>
                   <tr>
-                    <td style={{ ...label }}>未稅</td>
+                    <td style={{ ...label }}>工程承攬未稅金額</td>
                     <td style={amount}>${fmt(summary.roundedBeforeTax || summary.beforeTax)}</td>
                   </tr>
                   <tr>
@@ -4169,7 +4169,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
               {quote.taxRate > 0 ? (
                 <>
                   <tr>
-                    <td style={{ padding: "5px 10px", fontWeight: 600 }}>未稅</td>
+                    <td style={{ padding: "5px 10px", fontWeight: 600 }}>工程承攬未稅金額</td>
                     <td style={{ padding: "5px 10px", textAlign: "right", fontWeight: 700 }}>{fmt(summary.beforeTax)}</td>
                   </tr>
                   <tr>
