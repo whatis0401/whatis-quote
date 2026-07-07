@@ -3879,35 +3879,52 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
               let globalIdx = 0;
               return integratedData.map((gd, gi) => {
                 const rows = [];
+                // 群組標題列
+                rows.push(
+                  <tr key={`group-${gi}`}>
+                    <td colSpan={4} style={{
+                      ...label,
+                      fontWeight: 600,
+                      fontSize: 12,
+                      color: "#888",
+                      paddingTop: gi === 0 ? 6 : 14,
+                      paddingBottom: 4,
+                      borderBottom: "none",
+                      letterSpacing: 1,
+                    }}>{gd.group.name}</td>
+                  </tr>
+                );
+                // 大項列
                 gd.cats.forEach((cd, ci) => {
                   rows.push(
                     <tr key={`cat-${gi}-${ci}`}>
-                      <td style={{ ...label, textAlign: "center", color: "#888" }}>{letters[globalIdx++]}</td>
-                      <td style={label}>{cd.cat ? cd.cat.name : "其他"}</td>
+                      <td style={{ ...label, textAlign: "center", color: "#888", paddingLeft: 20 }}>{letters[globalIdx++]}</td>
+                      <td style={{ ...label, paddingLeft: 16 }}>{cd.cat ? cd.cat.name : "其他"}</td>
                       <td style={amount}>${fmt(cd.catTotal)}</td>
                       <td style={label}></td>
                     </tr>
                   );
                 });
-                if (gd.cats.length > 1) {
-                  rows.push(
-                    <tr key={`g${gi}-total`} style={{ background: "#fafafa" }}>
-                      <td colSpan={2} style={{ ...label, paddingLeft: 20, color: "#888", fontWeight: 600 }}>
-                        {gd.group.name}小計
-                      </td>
-                      <td style={{ ...amount, fontWeight: 600 }}>${fmt(gd.gTotal)}</td>
-                      <td style={label}></td>
-                    </tr>
-                  );
-                }
                 return rows;
               });
             })()}
 
-            {/* 工程管理費 */}
+            {/* 工程項目合計 */}
+            <tr style={{ background: "#f5f5f5", fontWeight: 600 }}>
+              <td colSpan={2} style={{ ...label, textAlign: "right", borderTop: "1px solid #ccc" }}>工程項目合計</td>
+              <td style={{ ...amount, borderTop: "1px solid #ccc" }}>${fmt(summary.subtotal)}</td>
+              <td style={{ ...label, borderTop: "1px solid #ccc" }}></td>
+            </tr>
+
+            {/* 工程管理費：合計下方，有間距 */}
             {quote.managementFeeMode !== "none" && (
-              <tr style={{ background: "#f9f9f9" }}>
-                <td style={{ ...label, textAlign: "center", color: "#888" }}>M</td>
+              <tr>
+                <td colSpan={4} style={{ padding: 0, height: 12, borderBottom: "none" }}></td>
+              </tr>
+            )}
+            {quote.managementFeeMode !== "none" && (
+              <tr>
+                <td style={{ ...label, textAlign: "center", color: "#888" }}></td>
                 <td style={label}>
                   工程管理費({quote.managementFeeValue}{quote.managementFeeMode === "percent" ? "%" : ""})
                   {summary.managementFeeDiscount > 0 && <span style={{ color: "#888" }}>（折扣）</span>}
@@ -3922,18 +3939,9 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                     </span>
                   ) : `$${fmt(summary.managementFee)}`}
                 </td>
-                <td style={label}>
-                  {summary.managementFeeDiscount > 0 && `整價後 $${fmt(summary.managementFee)}`}
-                </td>
+                <td style={label}></td>
               </tr>
             )}
-
-            {/* 合計列 */}
-            <tr style={{ background: "#f5f5f5", fontWeight: 600 }}>
-              <td colSpan={2} style={{ ...label, textAlign: "right" }}>工程項目合計</td>
-              <td style={amount}>${fmt(summary.subtotal)}</td>
-              <td style={label}></td>
-            </tr>
           </tbody>
         </table>
 
@@ -4765,6 +4773,14 @@ function EngineeringEditor({ groups, categories, onChangeGroups, onChangeCategor
     onChangeCategories([...otherCats, ...next.map((c, i) => ({ ...c, sortOrder: i + 1 }))]);
   }
 
+  function moveToGroup(catId, newGroupId) {
+    const otherCats = categories.filter(c => c.groupId === newGroupId);
+    const newSortOrder = otherCats.length + 1;
+    onChangeCategories(categories.map(c =>
+      c.id === catId ? { ...c, groupId: newGroupId, sortOrder: newSortOrder } : c
+    ));
+  }
+
   return (
     <div style={{ maxWidth: 640 }}>
       {groups.map(g => {
@@ -4887,6 +4903,23 @@ function EngineeringEditor({ groups, categories, onChangeGroups, onChangeCategor
                       borderColor: c.active !== false ? "#333" : "#e0e0e0",
                     }}
                   >✕</button>
+                  {/* 移至群組 */}
+                  <select
+                    title="移至其他群組"
+                    value={c.groupId}
+                    onChange={e => moveToGroup(c.id, e.target.value)}
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      marginLeft: 4, padding: "4px 6px", fontSize: 10,
+                      border: "1px solid #e0e0e0", borderRadius: 4,
+                      background: "#f9f9f9", color: "#888",
+                      cursor: "pointer", fontFamily: "inherit",
+                    }}
+                  >
+                    {groups.map(gr => (
+                      <option key={gr.id} value={gr.id}>{gr.name}</option>
+                    ))}
+                  </select>
                 </div>
               ))}
               <button
