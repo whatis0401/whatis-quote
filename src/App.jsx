@@ -3874,17 +3874,15 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
         <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20 }}>
           <colgroup>
-            <col style={{ width: "8%" }} />
-            <col style={{ width: "60%" }} />
-            <col style={{ width: "22%" }} />
-            <col style={{ width: "10%" }} />
+            <col style={{ width: "12%" }} />
+            <col style={{ width: "68%" }} />
+            <col style={{ width: "20%" }} />
           </colgroup>
           <thead>
             <tr style={{ background: "#f5f5f5", fontSize: 12, color: "#666" }}>
               <th style={{ ...label, textAlign: "center" }}>項目</th>
               <th style={{ ...label, textAlign: "left" }}>工程項目</th>
               <th style={{ ...amount }}>金額</th>
-              <th style={{ ...label }}>備註</th>
             </tr>
           </thead>
           <tbody>
@@ -3895,7 +3893,7 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                 // 群組標題列
                 rows.push(
                   <tr key={`group-${gi}`}>
-                    <td colSpan={4} style={{
+                    <td colSpan={3} style={{
                       ...label,
                       fontWeight: 600,
                       fontSize: isCompact ? 10 : 11,
@@ -3915,7 +3913,6 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
                       <td style={{ ...label, textAlign: "center", color: "#888" }}>{letters[globalIdx++]}</td>
                       <td style={{ ...label, textAlign: "left" }}>{cd.cat ? cd.cat.name : "其他"}</td>
                       <td style={{ ...amount }}>${fmt(cd.catTotal)}</td>
-                      <td style={{ ...label }}></td>
                     </tr>
                   );
                 });
@@ -3923,45 +3920,35 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
               });
             })()}
 
-            {/* 工程項目合計 + 管理費區：不分頁 */}
-            <tr>
-              <td colSpan={4} style={{ padding: 0, border: "none" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", pageBreakInside: "avoid" }}>
-                  <tbody>
-                    <tr style={{ background: "#f5f5f5", fontWeight: 600 }}>
-                      <td colSpan={2} style={{ ...label, textAlign: "right", borderTop: "1px solid #ccc", width: "calc(100% - 260px)" }}>工程項目合計</td>
-                      <td style={{ ...amount, borderTop: "1px solid #ccc", width: 140 }}>${fmt(summary.subtotal)}</td>
-                      <td style={{ ...label, borderTop: "1px solid #ccc", width: 120 }}></td>
-                    </tr>
-                    {quote.managementFeeMode !== "none" && (
-                      <tr>
-                        <td colSpan={4} style={{ padding: 0, height: 12, borderBottom: "none" }}></td>
-                      </tr>
-                    )}
-                    {quote.managementFeeMode !== "none" && (
-                      <tr>
-                        <td style={{ ...label, textAlign: "center", color: "#888" }}></td>
-                        <td style={label}>
-                          工程管理費({quote.managementFeeValue}{quote.managementFeeMode === "percent" ? "%" : ""})
-                          {summary.managementFeeDiscount > 0 && <span style={{ color: "#888" }}>（折扣）</span>}
-                        </td>
-                        <td style={amount}>
-                          {summary.managementFeeDiscount > 0 ? (
-                            <span>
-                              <span style={{ textDecoration: "line-through", color: "#aaa", marginRight: 8 }}>
-                                ${fmt(summary.managementFeeRaw)}
-                              </span>
-                              ${fmt(summary.managementFee)}
-                            </span>
-                          ) : `$${fmt(summary.managementFee)}`}
-                        </td>
-                        <td style={label}></td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </td>
+            {/* 工程項目合計 + 管理費 */}
+            <tr style={{ background: "#f5f5f5", fontWeight: 600 }}>
+              <td colSpan={2} style={{ ...label, textAlign: "right", borderTop: "1px solid #ccc" }}>工程項目合計</td>
+              <td style={{ ...amount, borderTop: "1px solid #ccc" }}>${fmt(summary.subtotal)}</td>
             </tr>
+            {quote.managementFeeMode !== "none" && (
+              <tr>
+                <td colSpan={3} style={{ padding: 0, height: 10, borderBottom: "none" }}></td>
+              </tr>
+            )}
+            {quote.managementFeeMode !== "none" && (
+              <tr>
+                <td style={{ ...label, textAlign: "center", color: "#888" }}></td>
+                <td style={label}>
+                  工程管理費({quote.managementFeeValue}{quote.managementFeeMode === "percent" ? "%" : ""})
+                  {summary.managementFeeDiscount > 0 && <span style={{ color: "#888" }}>（折扣）</span>}
+                </td>
+                <td style={amount}>
+                  {summary.managementFeeDiscount > 0 ? (
+                    <span>
+                      <span style={{ textDecoration: "line-through", color: "#aaa", marginRight: 8 }}>
+                        ${fmt(summary.managementFeeRaw)}
+                      </span>
+                      ${fmt(summary.managementFee)}
+                    </span>
+                  ) : `$${fmt(summary.managementFee)}`}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
 
