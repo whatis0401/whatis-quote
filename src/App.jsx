@@ -3949,48 +3949,45 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
               </td>
             </tr>
           </tbody>
+          <tfoot>
+            {/* 間距列 */}
+            <tr><td colSpan={4} style={{ height: 16, border: "none" }}></td></tr>
+            {/* 工程承攬未稅金額 / 工程承攬總價 */}
+            {quote.taxRate > 0 ? (
+              <>
+                <tr>
+                  <td colSpan={2} style={{ ...label, border: "none", textAlign: "right" }}>工程承攬未稅金額</td>
+                  <td style={{ ...amount, border: "none" }}>${fmt(summary.roundedBeforeTax || summary.beforeTax)}</td>
+                  <td style={{ border: "none" }}></td>
+                </tr>
+                <tr>
+                  <td colSpan={2} style={{ ...label, border: "none", textAlign: "right" }}>稅金</td>
+                  <td style={{ ...amount, border: "none" }}>${fmt(summary.taxAmount)}</td>
+                  <td style={{ border: "none" }}></td>
+                </tr>
+                <tr style={{ fontWeight: 700, fontSize: 15 }}>
+                  <td colSpan={2} style={{ ...label, borderTop: "2px solid #333", textAlign: "right" }}>總價</td>
+                  <td style={{ ...amount, borderTop: "2px solid #333", color: adj.totalColor }}>${fmt(summary.total)}</td>
+                  <td style={{ borderTop: "2px solid #333" }}></td>
+                </tr>
+              </>
+            ) : (
+              <tr style={{ fontWeight: 700, fontSize: 15 }}>
+                <td colSpan={2} style={{ ...label, borderTop: "2px solid #333", textAlign: "right", whiteSpace: "nowrap" }}>工程承攬總價</td>
+                <td style={{ ...amount, borderTop: "2px solid #333", color: adj.totalColor }}>${fmt(summary.total)}</td>
+                <td style={{ borderTop: "2px solid #333" }}></td>
+              </tr>
+            )}
+            {quote.showChineseAmount && (
+              <tr>
+                <td colSpan={4} style={{ fontSize: 12, color: "#555", textAlign: "right", padding: "4px 10px", border: "none" }}>
+                  合計新台幣：{toChineseAmount(summary.total)}
+                </td>
+              </tr>
+            )}
+          </tfoot>
         </table>
 
-        {/* 總計區 */}
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <table style={{ width: 300, borderCollapse: "collapse" }}>
-            <tbody>
-              {summary.roundingDiscount !== 0 && (
-                <tr>
-                  <td style={{ ...label, color: "#888" }}>整價</td>
-                  <td style={amount}>${fmt(summary.roundedBeforeTax)}</td>
-                </tr>
-              )}
-              {quote.taxRate > 0 ? (
-                <>
-                  <tr>
-                    <td style={{ ...label }}>工程承攬未稅金額</td>
-                    <td style={amount}>${fmt(summary.roundedBeforeTax || summary.beforeTax)}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ ...label }}>稅金</td>
-                    <td style={amount}>${fmt(summary.taxAmount)}</td>
-                  </tr>
-                  <tr style={{ fontWeight: 700, fontSize: 15 }}>
-                    <td style={{ ...label, borderTop: "2px solid #333" }}>總價</td>
-                    <td style={{ ...amount, borderTop: "2px solid #333", color: adj.totalColor }}>${fmt(summary.total)}</td>
-                  </tr>
-                </>
-              ) : (
-                <tr style={{ fontWeight: 700, fontSize: 15 }}>
-                  <td style={{ ...label, borderTop: "2px solid #333", whiteSpace: "nowrap" }}>工程承攬總價</td>
-                  <td style={{ ...amount, borderTop: "2px solid #333", color: adj.totalColor }}>${fmt(summary.total)}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {quote.showChineseAmount && (
-          <div style={{ fontSize: 12, color: "#555", marginTop: 8, textAlign: "right" }}>
-            合計新台幣：{toChineseAmount(summary.total)}
-          </div>
-        )}
       </div>
     );
   }
