@@ -3727,6 +3727,8 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
     signatureMarginTop: 35,
     totalColor: "#c0522a",
     printMargin: 10,
+    summaryColItem: 12,
+    summaryColName: 68,
   };
   const [showAdjust, setShowAdjust] = useState(false);
   const [adj, setAdj] = useState(() => {
@@ -3874,9 +3876,9 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
         <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20 }}>
           <colgroup>
-            <col style={{ width: "12%" }} />
-            <col style={{ width: "68%" }} />
-            <col style={{ width: "20%" }} />
+            <col style={{ width: `${adj.summaryColItem}%` }} />
+            <col style={{ width: `${adj.summaryColName}%` }} />
+            <col style={{ width: `${100 - adj.summaryColItem - adj.summaryColName}%` }} />
           </colgroup>
           <thead>
             <tr style={{ background: "#f5f5f5", fontSize: 12, color: "#666" }}>
@@ -4323,6 +4325,8 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
             { key: "signatureHeight", label: "簽章框高度", min: 40, max: 150, unit: "px" },
             { key: "signatureMarginTop", label: "簽章區上方間距", min: 0, max: 60, unit: "px" },
             { key: "printMargin", label: "列印頁面邊距", min: 3, max: 20, unit: "mm" },
+            { key: "summaryColItem", label: "總表項目欄寬", min: 5, max: 20, unit: "%" },
+            { key: "summaryColName", label: "總表工程項目欄寬", min: 40, max: 80, unit: "%" },
           ].map(({ key, label, min, max, unit }) => (
             <div key={key} style={{ marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
