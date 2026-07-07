@@ -3872,11 +3872,11 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
           工 程 估 價 總 表
         </div>
 
-        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 20, tableLayout: "fixed" }}>
           <thead>
             <tr style={{ background: "#f5f5f5", fontSize: 12, color: "#666" }}>
               <th style={{ ...label, width: 40, textAlign: "center" }}>項目</th>
-              <th style={{ ...label, paddingLeft: 8 }}>工程項目</th>
+              <th style={{ ...label, paddingLeft: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>工程項目</th>
               <th style={{ ...amount, width: 130 }}>金額</th>
               <th style={{ ...label, width: 80 }}>備註</th>
             </tr>
