@@ -3847,13 +3847,23 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
 
       const cats = sortedCatIds.map(catId => {
         const cat = categories.find(c => c.id === catId);
-        // 找出屬於這個大項的所有品項（含夾在中間的 section）
         const catNormalItems = gAllItems.filter(it => it.category === catId && it.unit !== "__section__");
         if (catNormalItems.length === 0) return null;
         const minIdx = Math.min(...catNormalItems.map(it => gAllItems.indexOf(it)));
         const maxIdx = Math.max(...catNormalItems.map(it => gAllItems.indexOf(it)));
-        // 取 minIdx 到 maxIdx 之間的所有品項（含 section）
-        const catItems = gAllItems.slice(minIdx, maxIdx + 1).filter(it =>
+
+        // 往前找緊接在 minIdx 之前的 section（直到遇到非 section 的品項為止）
+        let startIdx = minIdx;
+        for (let i = minIdx - 1; i >= 0; i--) {
+          if (gAllItems[i].unit === "__section__") {
+            startIdx = i;
+          } else {
+            break;
+          }
+        }
+
+        // 取 startIdx 到 maxIdx 之間的所有品項（含 section）
+        const catItems = gAllItems.slice(startIdx, maxIdx + 1).filter(it =>
           it.unit === "__section__" || it.category === catId
         );
         const catTotal = catItems.filter(it => it.unit !== "__section__").reduce((s, it) => s + it.total, 0);
