@@ -3828,25 +3828,38 @@ function PrintView({ quote, items, summary, settings, mode, onClose }) {
   // 整合式：計算各大項小計
   function buildIntegratedSummary() {
     const result = [];
-    // 依照 sortOrder 排序群組
     const sortedGroups = [...groups].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
     sortedGroups.forEach(g => {
-      const gItems = items.filter(it => it.group === g.id && it.unit !== "__section__");
+      // 依 sortOrder 排序所有品項（含 section）
+      const gAllItems = items
+        .filter(it => it.group === g.id)
+        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      // 不含 section 的品項（用於金額計算和大項分類）
+      const gItems = gAllItems.filter(it => it.unit !== "__section__");
       if (gItems.length === 0) return;
-      const cats = [];
-      // 取出此群組用到的大項 id，依照 categories 的 sortOrder 排序
+
       const usedCatIds = [...new Set(gItems.map(it => it.category))];
       const sortedCatIds = usedCatIds.sort((a, b) => {
         const catA = categories.find(c => c.id === a);
         const catB = categories.find(c => c.id === b);
         return (catA?.sortOrder || 999) - (catB?.sortOrder || 999);
       });
-      sortedCatIds.forEach(catId => {
+
+      const cats = sortedCatIds.map(catId => {
         const cat = categories.find(c => c.id === catId);
-        const catItems = gItems.filter(it => it.category === catId);
-        const catTotal = catItems.reduce((s, it) => s + it.total, 0);
-        cats.push({ cat, catItems, catTotal });
-      });
+        // 找出屬於這個大項的所有品項（含夾在中間的 section）
+        const catNormalItems = gAllItems.filter(it => it.category === catId && it.unit !== "__section__");
+        if (catNormalItems.length === 0) return null;
+        const minIdx = Math.min(...catNormalItems.map(it => gAllItems.indexOf(it)));
+        const maxIdx = Math.max(...catNormalItems.map(it => gAllItems.indexOf(it)));
+        // 取 minIdx 到 maxIdx 之間的所有品項（含 section）
+        const catItems = gAllItems.slice(minIdx, maxIdx + 1).filter(it =>
+          it.unit === "__section__" || it.category === catId
+        );
+        const catTotal = catItems.filter(it => it.unit !== "__section__").reduce((s, it) => s + it.total, 0);
+        return { cat, catItems, catTotal };
+      }).filter(Boolean);
+
       const gTotal = gItems.reduce((s, it) => s + it.total, 0);
       result.push({ group: g, cats, gTotal });
     });
