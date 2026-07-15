@@ -793,9 +793,24 @@ export default function App() {
         if (newSettings !== undefined) ops.push(sheetPut("Settings", settingsToRows(serialSettings)));
         if (newProjects !== undefined) ops.push(sheetPut("Projects", projectsToRows(newProjects)));
 
-        await Promise.all(ops);
+        const results = await Promise.all(ops);
         localStorage.removeItem("whatis_quote_cache");
-        showNotif("已儲存", "success");
+
+        // 驗證每個工作表的寫入結果
+        const failed = results.filter(r => r && r.success === false);
+        if (failed.length > 0) {
+          showNotif("⚠ 儲存異常：" + failed.map(r => r.error || r.sheet).join("、") + "，請勿關閉頁面", "error");
+          setTimeout(() => setNotification(null), 10000); // 顯示 10 秒
+          return;
+        }
+
+        // 顯示確認筆數
+        const itemResult = results.find(r => r && r.sheet === "QuoteItems");
+        if (itemResult && itemResult.rows !== undefined) {
+          showNotif(`✓ 已儲存｜品項確認 ${itemResult.rows} 筆`, "success");
+        } else {
+          showNotif("✓ 已儲存", "success");
+        }
       } catch (e) {
         showNotif("儲存失敗：" + e.message, "error");
       } finally {
