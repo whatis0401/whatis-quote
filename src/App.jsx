@@ -1755,6 +1755,44 @@ function QuoteEditor({ quote, items, allItems, settings, templates, onBack, onUp
     updateIts([...its, ...newItems]);
   }
 
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState(null); // null | { ok, sheetsRows, localRows }
+
+  async function verifyAndSave() {
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      // 從 Sheets 讀取目前的 QuoteItems
+      const rows = await sheetGet("QuoteItems");
+      const sheetsItems = rows.slice(1).filter(r => r[1] === quote.id); // quoteId 在第二欄
+      const localItems = its.filter(it => it.quoteId === quote.id);
+      const ok = sheetsItems.length === localItems.length;
+      setVerifyResult({ ok, sheetsRows: sheetsItems.length, localRows: localItems.length });
+    } catch (e) {
+      setVerifyResult({ ok: false, sheetsRows: -1, localRows: its.length, error: e.message });
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  async function forceSave() {
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const result = await sheetPut("QuoteItems", itemsToRows(its));
+      if (result.success) {
+        setVerifyResult({ ok: true, sheetsRows: result.rows, localRows: its.filter(it => it.quoteId === quote.id).length, forced: true });
+        localStorage.removeItem("whatis_quote_cache");
+      } else {
+        setVerifyResult({ ok: false, error: result.error || "強制儲存失敗", sheetsRows: -1, localRows: its.length });
+      }
+    } catch (e) {
+      setVerifyResult({ ok: false, error: e.message, sheetsRows: -1, localRows: its.length });
+    } finally {
+      setVerifying(false);
+    }
+  }
+
   if (printMode) {
     return (
       <PrintView
@@ -1790,7 +1828,36 @@ function QuoteEditor({ quote, items, allItems, settings, templates, onBack, onUp
             <div style={{ fontSize: 12, color: "#888" }}>{TYPE_LABELS[q.type]} · {STATUS_LABELS[q.status]}</div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {/* 驗證結果顯示 */}
+          {verifyResult && (
+            <div style={{
+              fontSize: 12, padding: "6px 12px", borderRadius: 4,
+              background: verifyResult.ok ? "#f0f8f4" : "#fdf0ee",
+              color: verifyResult.ok ? "#5a8f6a" : "#c0675a",
+              border: `1px solid ${verifyResult.ok ? "#c0e0cc" : "#f0c0b8"}`,
+              maxWidth: 280,
+            }}>
+              {verifyResult.ok
+                ? `✓ ${verifyResult.forced ? "強制儲存成功" : "驗證通過"}｜Sheets ${verifyResult.sheetsRows} 筆`
+                : verifyResult.error
+                  ? `⚠ ${verifyResult.error}`
+                  : `⚠ 不一致｜Sheets ${verifyResult.sheetsRows} 筆，畫面 ${verifyResult.localRows} 筆`
+              }
+              {!verifyResult.ok && (
+                <button
+                  onClick={forceSave}
+                  disabled={verifying}
+                  style={{ marginLeft: 8, fontSize: 11, padding: "2px 8px", border: "1px solid #c0675a", borderRadius: 3, background: "#c0675a", color: "#fff", cursor: "pointer", fontFamily: "inherit" }}
+                >強制儲存</button>
+              )}
+            </div>
+          )}
+          <button
+            style={{ ...S.btnSecondary, fontSize: 12 }}
+            onClick={verifyAndSave}
+            disabled={verifying}
+          >{verifying ? "驗證中…" : "驗證儲存"}</button>
           <button style={S.btnSecondary} onClick={() => setPrintMode("internal")}>內部版預覽</button>
           <button style={S.btn} onClick={() => setPrintMode("client")}>客戶版列印</button>
         </div>
