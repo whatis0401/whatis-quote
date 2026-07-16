@@ -286,6 +286,7 @@ const STATUS_LABELS = {
   confirmed: "已確認",
   addendum: "追加減帳中",
   closed: "已結案",
+  archived: "未選擇（封存）",
 };
 const STATUS_COLORS = {
   draft: "#bbbbbb",
@@ -293,6 +294,7 @@ const STATUS_COLORS = {
   confirmed: "#6aaa8a",
   addendum: "#c9a84c",
   closed: "#888888",
+  archived: "#cccccc",
 };
 const TYPE_LABELS = {
   independent: "獨立品項",
@@ -1601,7 +1603,7 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
         <div>
           {/* 資料夾列表 */}
           {sortedProjects.map(p => {
-            const pQuotes = quotes.filter(q => q.projectId === p.id).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+            const pQuotes = quotes.filter(q => q.projectId === p.id && q.status !== "archived").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
             const isOpen = expandedProjects[p.id];
             return (
               <div key={p.id} style={{ marginBottom: 12 }}>
@@ -1671,13 +1673,14 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
           {/* 未分類 */}
           {(() => {
             const isOpen = expandedProjects["__uncategorized__"] !== false;
+            const uncategorizedActive = uncategorized.filter(q => q.status !== "archived");
             return (
               <div style={{ marginBottom: 12 }}>
                 <div
                   style={{
                     display: "flex", alignItems: "center", gap: 10,
                     padding: "10px 16px", background: "#f9f9f7",
-                    borderRadius: isOpen && uncategorized.length > 0 ? "6px 6px 0 0" : 6,
+                    borderRadius: isOpen && uncategorizedActive.length > 0 ? "6px 6px 0 0" : 6,
                     border: "1px solid #e8e8e8",
                     cursor: "pointer", userSelect: "none",
                   }}
@@ -1685,13 +1688,53 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
                 >
                   <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#bbb", flexShrink: 0 }} />
                   <div style={{ fontWeight: 600, fontSize: 14, flex: 1, color: "#888" }}>未分類</div>
-                  <div style={{ fontSize: 12, color: "#888" }}>{uncategorized.length} 張</div>
+                  <div style={{ fontSize: 12, color: "#888" }}>{uncategorizedActive.length} 張</div>
                   <div style={{ fontSize: 12, color: "#aaa" }}>{isOpen ? "▲" : "▼"}</div>
                 </div>
-                {isOpen && uncategorized.length > 0 && (
+                {isOpen && uncategorizedActive.length > 0 && (
                   <div style={{ border: "1px solid #e8e8e8", borderTop: "none", borderRadius: "0 0 6px 6px" }}>
                     {tableHeader}
-                    {uncategorized.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(q => (
+                    {uncategorizedActive.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(q => (
+                      <QuoteRow key={q.id} q={q}
+                        allItems={allItems} settings={settings} sortedProjects={sortedProjects}
+                        showProjectMenu={showProjectMenu} setShowProjectMenu={setShowProjectMenu}
+                        onEdit={onEdit} onStatusChange={onStatusChange} onMoveToProject={onMoveToProject}
+                        onDuplicate={onDuplicate} onDelete={onDelete}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* 封存區（未選擇） */}
+          {(() => {
+            const archivedQuotes = quotes.filter(q => q.status === "archived")
+              .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+            if (archivedQuotes.length === 0) return null;
+            const isOpen = expandedProjects["__archived__"] === true;
+            return (
+              <div style={{ marginBottom: 12 }}>
+                <div
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "10px 16px", background: "#f5f5f5",
+                    borderRadius: isOpen ? "6px 6px 0 0" : 6,
+                    border: "1px solid #e8e8e8",
+                    cursor: "pointer", userSelect: "none",
+                  }}
+                  onClick={() => setExpandedProjects(prev => ({ ...prev, __archived__: !isOpen }))}
+                >
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#ccc", flexShrink: 0 }} />
+                  <div style={{ fontWeight: 600, fontSize: 14, flex: 1, color: "#aaa" }}>封存（未選擇）</div>
+                  <div style={{ fontSize: 12, color: "#aaa" }}>{archivedQuotes.length} 張</div>
+                  <div style={{ fontSize: 12, color: "#aaa" }}>{isOpen ? "▲" : "▼"}</div>
+                </div>
+                {isOpen && (
+                  <div style={{ border: "1px solid #e8e8e8", borderTop: "none", borderRadius: "0 0 6px 6px", opacity: 0.6 }}>
+                    {tableHeader}
+                    {archivedQuotes.map(q => (
                       <QuoteRow key={q.id} q={q}
                         allItems={allItems} settings={settings} sortedProjects={sortedProjects}
                         showProjectMenu={showProjectMenu} setShowProjectMenu={setShowProjectMenu}
@@ -1783,7 +1826,8 @@ function QuoteEditor({ quote, items, allItems, settings, templates, onBack, onUp
       setUnlockError("密碼錯誤");
     }
   }
-  const [verifyResult, setVerifyResult] = useState(null); // null | { ok, sheetsRows, localRows }
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState(null);
 
   async function verifyAndSave() {
     setVerifying(true);
