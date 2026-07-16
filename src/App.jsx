@@ -1332,11 +1332,23 @@ function Sidebar({ page, setPage }) {
 function QuoteRow({ q, allItems, settings, sortedProjects, showProjectMenu, setShowProjectMenu, onEdit, onStatusChange, onMoveToProject, onDuplicate, onDelete }) {
   const items = allItems.filter(it => it.quoteId === q.id).map(calcItem);
   const summary = calcQuoteSummary(items, q);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    function handleOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false);
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [showMenu]);
+
   return (
     <div
       style={{
         ...S.card, padding: "14px 20px", borderRadius: 4,
-        display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 170px",
+        display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 40px",
         alignItems: "center", gap: 8, cursor: "pointer", transition: "border-color 0.15s", marginBottom: 1,
       }}
       onMouseEnter={e => e.currentTarget.style.borderColor = "#ccc"}
@@ -1366,54 +1378,72 @@ function QuoteRow({ q, allItems, settings, sortedProjects, showProjectMenu, setS
           {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
         </select>
       </div>
-      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-        <div style={{ position: "relative" }}>
-          <button
-            style={{ ...S.btnSecondary, padding: "4px 8px", fontSize: 11 }}
-            onClick={e => { e.stopPropagation(); setShowProjectMenu(showProjectMenu === q.id ? null : q.id); }}
-            title="移至資料夾"
-          >📁</button>
-          {showProjectMenu === q.id && (
-            <div style={{
-              position: "absolute", right: 0, top: 28, zIndex: 50,
-              background: "#fff", border: "1px solid #e0e0e0", borderRadius: 4,
-              boxShadow: "0 4px 12px rgba(0,0,0,0.1)", minWidth: 160, overflow: "hidden",
-            }} onClick={e => e.stopPropagation()}>
-              <div style={{ padding: "6px 12px", fontSize: 11, color: "#aaa", borderBottom: "1px solid #f0f0f0" }}>移至資料夾</div>
-              <div
-                style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12 }}
+
+      {/* 三點選單 */}
+      <div style={{ position: "relative", display: "flex", justifyContent: "flex-end" }} ref={menuRef}>
+        <button
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#aaa", padding: "2px 6px", borderRadius: 4 }}
+          onClick={e => { e.stopPropagation(); setShowMenu(!showMenu); }}
+          onMouseEnter={e => e.target.style.background = "#f0f0f0"}
+          onMouseLeave={e => e.target.style.background = "none"}
+        >⋯</button>
+        {showMenu && (
+          <div style={{
+            position: "absolute", right: 0, top: 28, zIndex: 50,
+            background: "#fff", border: "1px solid #e0e0e0", borderRadius: 6,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.12)", minWidth: 160, overflow: "hidden",
+          }} onClick={e => e.stopPropagation()}>
+
+            {/* 移至資料夾 */}
+            <div style={{ padding: "6px 12px", fontSize: 11, color: "#aaa", borderBottom: "1px solid #f0f0f0" }}>移至資料夾</div>
+            <div style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12 }}
+              onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              onClick={() => { onMoveToProject(q.id, ""); setShowMenu(false); }}
+            >未分類</div>
+            {sortedProjects.map(p => (
+              <div key={p.id}
+                style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}
                 onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                onClick={() => { onMoveToProject(q.id, ""); setShowProjectMenu(null); }}
-              >未分類</div>
-              {sortedProjects.map(p => (
-                <div key={p.id}
-                  style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", gap: 8 }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  onClick={() => { onMoveToProject(q.id, p.id); setShowProjectMenu(null); }}
-                >
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.color, flexShrink: 0 }} />
-                  {p.name}
-                  {q.projectId === p.id && <span style={{ fontSize: 10, color: "#aaa" }}>（目前）</span>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        <button style={{ ...S.btnSecondary, padding: "4px 8px", fontSize: 11 }}
-          onClick={e => { e.stopPropagation(); onDuplicate(q.id); }}>複製</button>
-        <button
-          style={{ ...S.btnSecondary, padding: "4px 8px", fontSize: 11 }}
-          onClick={e => {
-            e.stopPropagation();
-            const qItems = allItems.filter(it => it.quoteId === q.id);
-            exportQuoteExcel(q, qItems, settings);
-          }}
-          title="匯出 Excel"
-        >匯出</button>
-        <button style={{ ...S.btnDanger, padding: "4px 8px", fontSize: 11 }}
-          onClick={e => { e.stopPropagation(); onDelete(q.id); }}>刪除</button>
+                onClick={() => { onMoveToProject(q.id, p.id); setShowMenu(false); }}
+              >
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: p.color, flexShrink: 0 }} />
+                {p.name}
+                {q.projectId === p.id && <span style={{ fontSize: 10, color: "#aaa" }}>（目前）</span>}
+              </div>
+            ))}
+
+            <div style={{ borderTop: "1px solid #f0f0f0", marginTop: 4 }} />
+
+            {/* 複製 */}
+            <div style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12 }}
+              onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              onClick={() => { onDuplicate(q.id); setShowMenu(false); }}
+            >複製報價單</div>
+
+            {/* 匯出 */}
+            <div style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12 }}
+              onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              onClick={() => {
+                const qItems = allItems.filter(it => it.quoteId === q.id);
+                exportQuoteExcel(q, qItems, settings);
+                setShowMenu(false);
+              }}
+            >匯出 Excel</div>
+
+            <div style={{ borderTop: "1px solid #f0f0f0", marginTop: 4 }} />
+
+            {/* 刪除 */}
+            <div style={{ padding: "8px 12px", cursor: "pointer", fontSize: 12, color: "#c0675a" }}
+              onMouseEnter={e => e.currentTarget.style.background = "#fdf0ee"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              onClick={() => { onDelete(q.id); setShowMenu(false); }}
+            >刪除</div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1498,7 +1528,7 @@ function QuoteList({ quotes, allItems, settings, onEdit, onNew, onDelete, onDupl
   const tableHeader = (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 170px",
+      gridTemplateColumns: "2fr 1fr 1fr 1fr 120px 100px 40px",
       padding: "8px 20px", fontSize: 11, color: "#aaa", fontWeight: 600, letterSpacing: 0.5,
     }}>
       <div>報價單名稱</div><div>客戶</div><div>日期</div>
