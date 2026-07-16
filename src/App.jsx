@@ -107,6 +107,7 @@ function rowsToQuotes(rows) {
     type: r[idx("type")] || "independent",
     status: r[idx("status")] || "draft",
     projectId: r[idx("projectId")] || "",
+    locked: r[idx("locked")] === "TRUE",
     clientName: r[idx("clientName")] || "",
     projectName: r[idx("projectName")] || "",
     projectAddress: r[idx("projectAddress")] || "",
@@ -132,14 +133,14 @@ function rowsToQuotes(rows) {
 
 function quotesToRows(quotes) {
   const h = [
-    "id","name","type","status","projectId","clientName","projectName","projectAddress","date",
+    "id","name","type","status","projectId","locked","clientName","projectName","projectAddress","date",
     "managementFeeMode","managementFeeValue","managementFeeBase","managementFeeOverride",
     "taxRate","roundingMode","roundingTarget","showChineseAmount","showBankAccount",
     "bankAccountId","termTemplateId","terms","internalNote","showManagementFeeInClient",
     "createdAt","updatedAt"
   ];
   return [h, ...quotes.map(q => [
-    q.id, q.name, q.type, q.status, q.projectId || "", q.clientName, q.projectName, q.projectAddress, q.date,
+    q.id, q.name, q.type, q.status, q.projectId || "", q.locked ? "TRUE" : "FALSE", q.clientName, q.projectName, q.projectAddress, q.date,
     q.managementFeeMode, q.managementFeeValue, q.managementFeeBase,
     q.managementFeeOverride ?? "",
     q.taxRate, q.roundingMode, q.roundingTarget,
@@ -1341,7 +1342,10 @@ function QuoteRow({ q, allItems, settings, sortedProjects, showProjectMenu, setS
       onClick={() => onEdit(q.id)}
     >
       <div>
-        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{q.name}</div>
+        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2, display: "flex", alignItems: "center", gap: 6 }}>
+          {q.locked && <span title="已鎖定" style={{ fontSize: 12 }}>🔒</span>}
+          {q.name}
+        </div>
         {q.projectName && <div style={{ fontSize: 12, color: "#888" }}>{q.projectName}</div>}
       </div>
       <div style={{ fontSize: 13, color: "#555" }}>{q.clientName || "—"}</div>
@@ -1755,7 +1759,30 @@ function QuoteEditor({ quote, items, allItems, settings, templates, onBack, onUp
     updateIts([...its, ...newItems]);
   }
 
-  const [verifying, setVerifying] = useState(false);
+  const LOCK_PASSWORD = "82825494";
+  const [showUnlockInput, setShowUnlockInput] = useState(false);
+  const [unlockPw, setUnlockPw] = useState("");
+  const [unlockError, setUnlockError] = useState("");
+  const isLocked = q.locked === true;
+
+  function handleLock() {
+    const next = { ...q, locked: true, updatedAt: now() };
+    setQ(next);
+    onUpdateQuote(next);
+  }
+
+  function handleUnlock() {
+    if (unlockPw === LOCK_PASSWORD) {
+      const next = { ...q, locked: false, updatedAt: now() };
+      setQ(next);
+      onUpdateQuote(next);
+      setShowUnlockInput(false);
+      setUnlockPw("");
+      setUnlockError("");
+    } else {
+      setUnlockError("密碼錯誤");
+    }
+  }
   const [verifyResult, setVerifyResult] = useState(null); // null | { ok, sheetsRows, localRows }
 
   async function verifyAndSave() {
@@ -1829,6 +1856,46 @@ function QuoteEditor({ quote, items, allItems, settings, templates, onBack, onUp
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {/* 鎖定狀態提示 */}
+          {isLocked && (
+            <div style={{ fontSize: 12, color: "#c9a84c", background: "#fdf6e3", border: "1px solid #f0e0a0", borderRadius: 4, padding: "6px 12px", fontWeight: 600 }}>
+              🔒 已鎖定（唯讀）
+            </div>
+          )}
+
+          {/* 解鎖輸入框 */}
+          {showUnlockInput && (
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <input
+                autoFocus
+                type="password"
+                placeholder="輸入密碼解鎖"
+                value={unlockPw}
+                onChange={e => { setUnlockPw(e.target.value); setUnlockError(""); }}
+                onKeyDown={e => { if (e.key === "Enter") handleUnlock(); if (e.key === "Escape") { setShowUnlockInput(false); setUnlockPw(""); setUnlockError(""); } }}
+                style={{ ...S.input, width: 140, fontSize: 12, padding: "6px 10px" }}
+              />
+              <button style={{ ...S.btn, fontSize: 12, padding: "6px 12px" }} onClick={handleUnlock}>確認</button>
+              <button style={{ ...S.btnSecondary, fontSize: 12 }} onClick={() => { setShowUnlockInput(false); setUnlockPw(""); setUnlockError(""); }}>取消</button>
+              {unlockError && <span style={{ fontSize: 11, color: "#c0675a" }}>{unlockError}</span>}
+            </div>
+          )}
+
+          {/* 鎖定/解鎖按鈕 */}
+          {!showUnlockInput && (
+            isLocked ? (
+              <button
+                style={{ ...S.btnSecondary, fontSize: 12 }}
+                onClick={() => setShowUnlockInput(true)}
+              >🔓 解鎖編輯</button>
+            ) : (
+              <button
+                style={{ ...S.btnSecondary, fontSize: 12 }}
+                onClick={handleLock}
+              >🔒 鎖定</button>
+            )
+          )}
+
           {/* 驗證結果顯示 */}
           {verifyResult && (
             <div style={{
@@ -1853,15 +1920,35 @@ function QuoteEditor({ quote, items, allItems, settings, templates, onBack, onUp
               )}
             </div>
           )}
-          <button
-            style={{ ...S.btnSecondary, fontSize: 12 }}
-            onClick={verifyAndSave}
-            disabled={verifying}
-          >{verifying ? "驗證中…" : "驗證儲存"}</button>
+          {!isLocked && (
+            <button
+              style={{ ...S.btnSecondary, fontSize: 12 }}
+              onClick={verifyAndSave}
+              disabled={verifying}
+            >{verifying ? "驗證中…" : "驗證儲存"}</button>
+          )}
           <button style={S.btnSecondary} onClick={() => setPrintMode("internal")}>內部版預覽</button>
           <button style={S.btn} onClick={() => setPrintMode("client")}>客戶版列印</button>
         </div>
       </div>
+
+      {/* 鎖定時的唯讀遮罩提示 */}
+      {isLocked && (
+        <div style={{
+          background: "#fdf6e3",
+          border: "1px solid #f0e0a0",
+          borderRadius: 6,
+          padding: "10px 16px",
+          marginBottom: 20,
+          fontSize: 13,
+          color: "#c9a84c",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}>
+          🔒 此報價單已鎖定，目前為唯讀模式。點右上角「解鎖編輯」並輸入密碼才能修改。
+        </div>
+      )}
 
       {/* 分頁 Tab */}
       <div style={{ display: "flex", gap: 0, marginBottom: 28, borderBottom: "1px solid #eee" }}>
@@ -1887,7 +1974,7 @@ function QuoteEditor({ quote, items, allItems, settings, templates, onBack, onUp
 
       {/* 基本資料 */}
       {activeSection === "info" && (
-        <div style={{ ...S.card, maxWidth: 720 }}>
+        <div style={{ ...S.card, maxWidth: 720, opacity: isLocked ? 0.7 : 1, pointerEvents: isLocked ? "none" : "auto" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px 28px" }}>
             <div style={{ gridColumn: "1 / -1" }}>
               <label style={S.label}>報價單名稱</label>
@@ -1940,14 +2027,15 @@ function QuoteEditor({ quote, items, allItems, settings, templates, onBack, onUp
           items={its}
           settings={settings}
           templates={templates}
-          onChange={updateIts}
-          onApplyTemplate={applyTemplate}
+          onChange={isLocked ? () => {} : updateIts}
+          onApplyTemplate={isLocked ? () => {} : applyTemplate}
+          isLocked={isLocked}
         />
       )}
 
       {/* 費用設定 */}
       {activeSection === "fees" && (
-        <div style={{ ...S.card, maxWidth: 600 }}>
+        <div style={{ ...S.card, maxWidth: 600, opacity: isLocked ? 0.7 : 1, pointerEvents: isLocked ? "none" : "auto" }}>
           <h3 style={{ margin: "0 0 24px", fontSize: 15, fontWeight: 600 }}>費用設定</h3>
 
           {/* 工程管理費 */}
@@ -2051,7 +2139,7 @@ function QuoteEditor({ quote, items, allItems, settings, templates, onBack, onUp
 
       {/* 輸出設定 */}
       {activeSection === "output" && (
-        <div style={{ ...S.card, maxWidth: 600 }}>
+        <div style={{ ...S.card, maxWidth: 600, opacity: isLocked ? 0.7 : 1, pointerEvents: isLocked ? "none" : "auto" }}>
           <h3 style={{ margin: "0 0 24px", fontSize: 15, fontWeight: 600 }}>輸出設定</h3>
 
           {/* 備註條款 */}
