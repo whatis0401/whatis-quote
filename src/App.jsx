@@ -807,17 +807,26 @@ export default function App() {
         const failed = results.filter(r => r && r.success === false);
         if (failed.length > 0) {
           showNotif("⚠ 儲存異常：" + failed.map(r => r.error || r.sheet).join("、") + "，請勿關閉頁面", "error");
-          setTimeout(() => setNotification(null), 10000); // 顯示 10 秒
+          setTimeout(() => setNotification(null), 10000);
           return;
         }
 
-        // 顯示確認筆數
-        const itemResult = results.find(r => r && r.sheet === "QuoteItems");
-        if (itemResult && itemResult.rows !== undefined) {
-          showNotif(`✓ 已儲存｜品項確認 ${itemResult.rows} 筆`, "success");
+        // 如果有寫入 QuoteItems，自動驗證確認筆數
+        if (newItems !== undefined) {
+          const localCount = itemsToRows(saveI).length - 1; // 扣掉 header
+          // 從 Sheets 重新讀取確認
+          const verifyRows = await sheetGet("QuoteItems");
+          const sheetsCount = verifyRows.length - 1;
+          if (sheetsCount !== localCount) {
+            showNotif(`⚠ 儲存驗證失敗｜Sheets ${sheetsCount} 筆，預期 ${localCount} 筆，請勿關閉頁面`, "error");
+            setTimeout(() => setNotification(null), 15000);
+            return;
+          }
+          showNotif(`✓ 已儲存並驗證｜品項 ${sheetsCount} 筆`, "success");
         } else {
           showNotif("✓ 已儲存", "success");
         }
+
       } catch (e) {
         showNotif("儲存失敗：" + e.message, "error");
       } finally {
