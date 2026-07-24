@@ -183,7 +183,11 @@ function itemsToRows(items) {
     "id","quoteId","group","category","position","itemName","unit","qty",
     "cost","multiplier","price","priceOverride","total","note","sortOrder","tag","tagMemo","updatedAt"
   ];
-  return [h, ...items.map(it => [
+  // 過濾掉空白品項（itemName 為空且不是 section 標題）
+  const validItems = items.filter(it =>
+    it.unit === "__section__" || (it.itemName && it.itemName.trim() !== "")
+  );
+  return [h, ...validItems.map(it => [
     it.id, it.quoteId, it.group, it.category, it.position,
     it.itemName, it.unit, it.qty, it.cost, it.multiplier,
     it.price, it.priceOverride ? "TRUE" : "FALSE",
